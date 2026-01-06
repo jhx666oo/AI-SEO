@@ -201,6 +201,17 @@ export const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Map XOOBAY language to AI output language
+  const mapXoobayLangToOutputLang = (xoobayLang: XoobayLanguage): string => {
+    const langMap: Record<XoobayLanguage, string> = {
+      'zh_cn': 'zh-CN',
+      'en': 'en',
+      'zh_hk': 'zh-TW',
+      'ru': 'ru',
+    };
+    return langMap[xoobayLang] || 'auto';
+  };
+
   const handleReadPage = async () => {
     if (selectedProductId) {
       const content = await loadProductAsPageContent(selectedProductId, { lang: xoobayLang });
@@ -209,6 +220,12 @@ export const App: React.FC = () => {
         setEditedContent(content.text);
         setSelectedImages(content.images || []);
         updateSessionPageContent(content);
+        // 可选：自动同步 AI 输出语言到 XOOBAY 语言
+        // 如果当前是 auto 或与 XOOBAY 语言不匹配，则自动同步
+        const mappedLang = mapXoobayLangToOutputLang(xoobayLang);
+        if (aiConfig.outputLanguage === 'auto' || aiConfig.outputLanguage !== mappedLang) {
+          setAiConfig(c => ({ ...c, outputLanguage: mappedLang }));
+        }
         setStep('edit');
       }
     }
@@ -1110,9 +1127,22 @@ export const App: React.FC = () => {
                     <label className="block text-xs text-dark-400 mb-1.5">🌐 Language</label>
                     <select
                       value={xoobayLang}
-                      onChange={(e) => {
-                        setXoobayLang(e.target.value as XoobayLanguage);
+                      onChange={async (e) => {
+                        const newLang = e.target.value as XoobayLanguage;
+                        setXoobayLang(newLang);
                         setSelectedProductId(null);
+                        // 自动刷新产品列表
+                        try {
+                          await searchProducts(
+                            {
+                              pageNo: 1,
+                              name: xoobaySearchTerm || undefined,
+                            },
+                            { lang: newLang }
+                          );
+                        } catch (error) {
+                          console.error('[App] Failed to refresh products after language change:', error);
+                        }
                       }}
                       className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                     >
