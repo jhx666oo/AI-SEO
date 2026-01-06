@@ -54,8 +54,15 @@ export async function sendToAI(
     { role: 'user', content: userContent }
   ];
 
-  // Build request body
-  const requestBody: Record<string, unknown> = {
+  // Build request body with explicit type
+  interface AIRequestBody {
+    model: string;
+    messages: AIMessage[];
+    temperature?: number;
+    web_search?: boolean;
+  }
+
+  const requestBody: AIRequestBody = {
     model: settings.model,
     messages,
   };
@@ -75,7 +82,18 @@ export async function sendToAI(
 
   const apiUrl = `${settings.baseUrl}/chat/completions`;
   console.log('[AI Service] Calling API:', apiUrl);
-  console.log('[AI Service] Request body (preview):', JSON.stringify({ ...requestBody, messages: [{ ...requestBody.messages[0], content: requestBody.messages[0].content.substring(0, 100) + '...' }, { ...requestBody.messages[1], content: requestBody.messages[1].content.substring(0, 100) + '...' }] }));
+  
+  // Create preview of request body with truncated content for logging
+  const previewMessages = messages.map(msg => {
+    if (typeof msg.content === 'string') {
+      return {
+        ...msg,
+        content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : '')
+      };
+    }
+    return msg;
+  });
+  console.log('[AI Service] Request body (preview):', JSON.stringify({ ...requestBody, messages: previewMessages }));
 
   try {
     const response = await fetch(apiUrl, {
