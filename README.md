@@ -73,10 +73,17 @@
 ### 从源码安装
 
 1. **克隆仓库**
+   
+   如果您还没有项目代码，请克隆仓库：
    ```bash
    git clone https://github.com/jhx666oo/AI-SEO.git
    cd AI-SEO
    ```
+   
+   > **注意**: 
+   > - 克隆后会自动创建 `AI-SEO` 目录（与 GitHub 仓库名相同）
+   > - 如果您本地已经有项目代码（无论目录名是什么），可以直接进入项目根目录，跳过克隆步骤
+   > - 项目根目录应包含 `package.json`、`src/`、`index.html` 等文件
 
 2. **安装依赖**
    ```bash
