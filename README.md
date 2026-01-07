@@ -24,10 +24,12 @@
 - **产品详情提取** - 自动提取产品名称、描述、规格等信息
 
 ### 🤖 AI 内容生成
-- **文本生成** - 使用 AI 生成 SEO/GEO 优化的产品博客文章
-- **视频生成** - 支持多种视频生成模型（Sora、Veo、Runway、Kling 等）
-- **多模型支持** - 支持 GPT-5、Claude、Gemini、DeepSeek、Grok 等多种 AI 模型
-- **自定义提示词** - 可自定义系统提示词和生成参数
+- **双态化配置 (Dual-Mode)** - 支持 **Internal Mode (内网 Agent)** 和 **DIY Mode (手动配置)**。
+- **2025 旗舰模型支持** - 全面适配 GPT-5.1、Claude-4.5、Gemini-3、Grok-4、DeepSeek-V3.2 等最新模型。
+- **文本生成** - 使用 AI 生成 SEO/GEO 优化的产品博客文章。
+- **视频生成** - 支持多种领先视频生成模型（Sora Pro、Veo-3、Kling 1.5 等）。
+- **内容审计 (Audit Trail)** - 自动记录品牌数据和商业活动，支持后端分析。
+- **自定义提示词** - 可基于公司品牌信息自定义系统提示词和生成参数。
 
 ### ⚙️ 内容配置
 - **输出语言** - 支持 12+ 种语言（中文、English、日本語、Русский 等）
@@ -430,14 +432,15 @@
 
 ### 支持的 AI 模型
 
-#### 文本生成模型
+#### 文本生成模型 (2025 Flagship)
 
-- **OpenAI**: GPT-5.1, GPT-5, GPT-5-mini, o3
-- **Anthropic**: Claude-Opus-4.5, Claude-4.5-Sonnet, Claude-3.7-Sonnet
-- **Google**: Gemini-3-Pro-Preview, Gemini-2.5-Pro, Gemini-2.5-Flash
-- **xAI**: Grok-4, Grok-4.1-Fast, Grok-4-Fast
-- **DeepSeek**: DeepSeek-V3.2, DeepSeek-V3.1-Terminus, DeepSeek-R1
-- **其他**: Kimi-K2-Thinking, Qwen3-235B, MiniMax-M2, Nova-2.0-Pro-Preview
+- **OpenAI**: GPT-5.1, GPT-5, GPT-5-mini, o3-high
+- **Anthropic**: Claude-Opus-4.5, Claude-4.5-Sonnet
+- **Google**: Gemini-3-Pro-Preview, Gemini-2.5-Pro, Gemini-2.0-Flash
+- **xAI**: Grok-4, Grok-4.1-Fast
+- **DeepSeek**: DeepSeek-V3.2, DeepSeek-R1 (推理引擎)
+- **Perplexity**: Sonar-Reasoning-Pro, Sonar-Pro (实时搜索)
+- **其他**: Qwen3-235B, Kimi-K2, MiniMax-M2 (ABAB)
 
 #### 视频生成模型
 
