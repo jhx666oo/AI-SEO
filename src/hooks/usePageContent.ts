@@ -5,10 +5,10 @@ export function usePageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getPageContentByUrl = useCallback(async (url: string): Promise<PageContent | null> => {
+  const getPageContentByUrl = useCallback(async (_url: string): Promise<PageContent | null> => {
     setLoading(true);
     setError(null);
-    
+
     try {
       // TODO: 通过后端代理接口获取网页内容
       // 示例接口调用（需要根据实际后端 API 调整）:

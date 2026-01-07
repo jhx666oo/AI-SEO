@@ -21,9 +21,37 @@ interface VideoResponse {
   error?: string;
 }
 
-// POE API uses unified chat/completions endpoint for all models including video
-// Reference: https://creator.poe.com/docs/poe-api-overview
-// Video models return video URLs in message.content
+// Commercialization logic settings
+const INTERNAL_API_CONFIG = {
+  baseUrl: 'https://api.yourcompany.com/v1', // ⚠️ 请在此处替换为公司生产环境 API 地址
+  apiKey: 'your-internal-api-key',          // ⚠️ 请在此处替换为公司生产环境 API Key
+};
+
+/**
+ * Log user activity for business analysis (Audit Trail)
+ */
+async function logUserActivity(data: {
+  brandName: string;
+  companyName: string;
+  pageUrl: string;
+  provider: string;
+  model: string;
+}) {
+  try {
+    console.log('[Audit Trail] Logging activity:', data);
+    // Asynchronous call to company backend
+    fetch('https://api.yourcompany.com/audit/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...data,
+        timestamp: new Date().toISOString(),
+      }),
+    }).catch(err => console.error('[Audit Trail] Failed to log activity:', err));
+  } catch (err) {
+    console.error('[Audit Trail] Error in logUserActivity:', err);
+  }
+}
 
 export async function sendToAI(
   userContent: string,
@@ -31,48 +59,69 @@ export async function sendToAI(
   aiConfig: AIConfig
 ): Promise<AIResponse> {
   console.log('[AI Service] ========== AI REQUEST STARTED ==========');
-  console.log('[AI Service] Base URL:', settings.baseUrl);
-  console.log('[AI Service] Model:', settings.model);
-  console.log('[AI Service] API Key configured:', !!settings.apiKey);
-  console.log('[AI Service] User content length:', userContent.length, 'chars');
-  
-  if (!settings.apiKey) {
+
+  const isInternal = settings.apiMode === 'internal';
+  const baseUrl = isInternal ? INTERNAL_API_CONFIG.baseUrl : settings.baseUrl;
+  const apiKey = isInternal ? INTERNAL_API_CONFIG.apiKey : settings.apiKey;
+  const provider = settings.provider;
+
+  console.log('[AI Service] Mode:', settings.apiMode);
+  console.log('[AI Service] Provider:', provider);
+  console.log('[AI Service] Base URL:', baseUrl);
+
+  if (!apiKey && !isInternal) {
     const errorMsg = 'API Key not configured. Please add your API key in Settings.';
-    console.error('[AI Service] ERROR:', errorMsg);
     return { content: '', error: errorMsg };
   }
 
-  if (!settings.baseUrl) {
+  // MOCK MODE FOR TESTING
+  if (apiKey === 'mock') {
+    console.log('[AI Service] MOCK MODE ACTIVE');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return {
+      content: `[MOCK RESPONSE for ${settings.model}]\n\n**Meta Title**: ${settings.brandName || 'Product'} SEO Title\n**Meta Description**: This is a mock SEO description for ${settings.companyName || 'the company'}.\n\nHere is your SEO blog content...`
+    };
+  }
+
+  if (!baseUrl) {
     const errorMsg = 'Base URL not configured. Please check your settings.';
-    console.error('[AI Service] ERROR:', errorMsg);
     return { content: '', error: errorMsg };
   }
 
-  // Use the systemPrompt directly - it already includes all config options
+  // Audit Trail Logging
+  logUserActivity({
+    brandName: settings.brandName || 'Unknown',
+    companyName: settings.companyName || 'Unknown',
+    pageUrl: window.location.href, // Or get from aiConfig if available
+    provider: provider,
+    model: settings.model,
+  });
+
   const messages: AIMessage[] = [
     { role: 'system', content: aiConfig.systemPrompt },
     { role: 'user', content: userContent }
   ];
 
-  // Build request body with explicit type
-  interface AIRequestBody {
-    model: string;
-    messages: AIMessage[];
-    temperature?: number;
-    web_search?: boolean;
-  }
-
-  const requestBody: AIRequestBody = {
+  // Unified Request Body Template
+  let requestBody: any = {
     model: settings.model,
-    messages,
+    messages: messages,
+    temperature: 0.7,
   };
 
-  // Add optional parameters based on config
+  // Provider-specific adjustments
+  if (provider === 'gemini') {
+    // Example for Google Gemini specific format if needed
+    // requestBody = { ... }
+  } else if (provider === 'grok') {
+    // Example for Grok specific format
+  }
+
+  // Add optional parameters
   if (aiConfig.enableWebSearch) {
     requestBody.web_search = true;
   }
 
-  // Map reasoning effort to temperature
   const reasoningMap: Record<string, number> = {
     'low': 0.3,
     'medium': 0.7,
@@ -80,27 +129,14 @@ export async function sendToAI(
   };
   requestBody.temperature = reasoningMap[aiConfig.reasoningEffort] || 0.7;
 
-  const apiUrl = `${settings.baseUrl}/chat/completions`;
-  console.log('[AI Service] Calling API:', apiUrl);
-  
-  // Create preview of request body with truncated content for logging
-  const previewMessages = messages.map(msg => {
-    if (typeof msg.content === 'string') {
-      return {
-        ...msg,
-        content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : '')
-      };
-    }
-    return msg;
-  });
-  console.log('[AI Service] Request body (preview):', JSON.stringify({ ...requestBody, messages: previewMessages }));
+  const apiUrl = `${baseUrl}/chat/completions`;
 
   try {
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(requestBody),
     });
@@ -122,46 +158,31 @@ export async function sendToAI(
       } catch (parseError) {
         console.error('[AI Service] Failed to parse error response:', parseError);
       }
-      
-      // Provide more specific error messages based on status code
-      if (response.status === 401) {
-        errorMessage = 'Authentication failed. Please check your API Key.';
-      } else if (response.status === 403) {
-        errorMessage = 'Access forbidden. Please check your API Key permissions.';
-      } else if (response.status === 404) {
-        errorMessage = 'API endpoint not found. Please check your Base URL.';
-      } else if (response.status === 429) {
-        errorMessage = 'Rate limit exceeded. Please try again later.';
-      } else if (response.status >= 500) {
-        errorMessage = `Server error (${response.status}). Please try again later.`;
-      }
-      
+
       console.error('[AI Service] ERROR:', errorMessage);
       return { content: '', error: errorMessage };
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
-    console.log('[AI Service] SUCCESS - Response content length:', content.length, 'chars');
-    console.log('[AI Service] ========== AI REQUEST COMPLETED ==========');
     return { content };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error('[AI Service] EXCEPTION:', errorMessage);
-    
+
     // Provide more specific error messages for common network errors
     if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
       const networkError = 'Network error: Unable to connect to API. Please check your internet connection and Base URL.';
       console.error('[AI Service] Network error detected');
       return { content: '', error: networkError };
     }
-    
+
     if (errorMessage.includes('CORS')) {
       const corsError = 'CORS error: API server does not allow requests from this origin.';
       console.error('[AI Service] CORS error detected');
       return { content: '', error: corsError };
     }
-    
+
     console.error('[AI Service] ========== AI REQUEST FAILED ==========');
     return { content: '', error: errorMessage };
   }
@@ -174,7 +195,7 @@ export function buildPrompt(
   formatType: 'json' | 'xml' | 'custom'
 ): string {
   let formatInstruction = '';
-  
+
   if (formatType === 'json') {
     formatInstruction = `Please analyze the content and return the result in the following JSON format. Only return valid JSON, no other text:
 
@@ -207,13 +228,13 @@ export async function generateVideoPrompt(
   settings: Settings
 ): Promise<{ prompt: string; error?: string }> {
   console.log('[Video Prompt] ========== GENERATING VIDEO PROMPT ==========');
-  console.log('[Video Prompt] Using Text AI to generate video prompt');
-  console.log('[Video Prompt] Text API Base URL:', settings.baseUrl);
-  console.log('[Video Prompt] Model:', settings.model);
-  
-  if (!settings.apiKey) {
-    console.error('[Video Prompt] API Key not configured');
-    return { prompt: '', error: 'API Key not configured. Please add your POE API key in Settings.' };
+
+  const isInternal = settings.apiMode === 'internal';
+  const baseUrl = isInternal ? INTERNAL_API_CONFIG.baseUrl : settings.baseUrl;
+  const apiKey = isInternal ? INTERNAL_API_CONFIG.apiKey : settings.apiKey;
+
+  if (!apiKey && !isInternal) {
+    return { prompt: '', error: 'API Key not configured. Please add your key in Settings.' };
   }
 
   const promptMessages: AIMessage[] = [
@@ -222,14 +243,14 @@ export async function generateVideoPrompt(
   ];
 
   try {
-    const textApiUrl = `${settings.baseUrl}/chat/completions`;
-    console.log('[Video Prompt] Calling Text API:', textApiUrl);
-    
+    const textApiUrl = `${baseUrl}/chat/completions`;
+    console.log('[Video Prompt] Calling API:', textApiUrl);
+
     const response = await fetch(textApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: settings.model,
@@ -238,23 +259,13 @@ export async function generateVideoPrompt(
       }),
     });
 
-    console.log('[Video Prompt] Response status:', response.status, response.statusText);
-    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Video Prompt] Error response:', errorText.substring(0, 500));
-      try {
-        const error = JSON.parse(errorText);
-        return { prompt: '', error: error.error?.message || `Prompt API Error: ${response.status}` };
-      } catch {
-        return { prompt: '', error: `Prompt API Error: ${response.status} - ${response.statusText}` };
-      }
+      return { prompt: '', error: `Prompt API Error: ${response.status} - ${errorText.substring(0, 100)}` };
     }
 
     const data = await response.json();
     const generatedPrompt = data.choices?.[0]?.message?.content || '';
-    console.log('[Video Prompt] Generated prompt length:', generatedPrompt.length, 'chars');
-    console.log('[Video Prompt] SUCCESS - Video prompt generated');
     return { prompt: generatedPrompt };
   } catch (err) {
     console.error('[Video Prompt] Exception:', err);
@@ -270,11 +281,11 @@ export async function generateVideoPrompt(
 // 4. Plain text with URL embedded
 function parseVideoUrlFromResponse(content: string): string | null {
   if (!content) return null;
-  
+
   console.log('[Video Parse] Parsing response for video URL...');
   console.log('[Video Parse] Content length:', content.length, 'chars');
   console.log('[Video Parse] Content preview:', content.substring(0, 500));
-  
+
   // Try to parse as JSON first
   try {
     const json = JSON.parse(content);
@@ -286,108 +297,89 @@ function parseVideoUrlFromResponse(content: string): string | null {
   } catch {
     // Not JSON, continue with other methods
   }
-  
-  // Try to find video URL patterns
-  const videoUrlPatterns = [
-    // Direct video URLs
-    /https?:\/\/[^\s"'<>]+\.(?:mp4|webm|mov|avi|mkv)(?:\?[^\s"'<>]*)?/gi,
-    // URLs in markdown format
-    /\[.*?\]\((https?:\/\/[^\s)]+\.(?:mp4|webm|mov)(?:\?[^\s)]*)?)\)/gi,
-    // URLs in image/video markdown
-    /!\[.*?\]\((https?:\/\/[^\s)]+)\)/gi,
-    // General HTTPS URLs (fallback)
-    /https?:\/\/[^\s"'<>]+/gi,
-  ];
-  
-  for (const pattern of videoUrlPatterns) {
-    const matches = content.match(pattern);
-    if (matches && matches.length > 0) {
-      // Extract URL from markdown if needed
-      let url = matches[0];
-      const markdownMatch = url.match(/\((https?:\/\/[^)]+)\)/);
-      if (markdownMatch) {
-        url = markdownMatch[1];
+
+  // Try to find a URL that looks like a video file or a hosted video page
+  // Broadened to include common cloud storage and video hosting markers
+  const urlRegex = /(https?:\/\/[^\s"'<>]+(?:\.mp4|\.mov|\.webm|\/video\/|v\.|\/v\/|aws|blob|cdn|poecdn|hopp\.io|kling|runway)[^\s"'<>]*)/gi;
+  const matches = content.match(urlRegex);
+
+  if (matches && matches.length > 0) {
+    // Return the first match that isn't obviously a static image unless no other choice
+    for (const url of matches) {
+      if (/\.(mp4|mov|webm|m4v)/i.test(url) || url.includes('/video/') || url.includes('poecdn') || url.includes('hopp.io')) {
+        console.log('[Video Parse] Selected URL:', url);
+        return url;
       }
-      console.log('[Video Parse] Found URL:', url);
-      return url;
     }
+    return matches[0];
   }
-  
+
   console.log('[Video Parse] No video URL found in response');
   return null;
 }
 
-// Create video using POE Chat API
-// POE uses unified chat/completions endpoint for all models
-// Reference: https://creator.poe.com/docs/poe-api-overview
+// Create video using Video Generation API
 export async function createVideoTask(
   prompt: string,
   videoConfig: VideoConfig,
   settings: Settings
 ): Promise<VideoResponse> {
-  if (!settings.apiKey) {
-    return { 
+  const isInternal = settings.apiMode === 'internal';
+  const baseUrl = isInternal ? INTERNAL_API_CONFIG.baseUrl : settings.baseUrl;
+  const apiKey = isInternal ? INTERNAL_API_CONFIG.apiKey : settings.apiKey;
+
+  if (!apiKey && !isInternal) {
+    return {
       result: { type: 'text', status: 'failed', content: prompt, prompt },
-      error: 'API Key not configured. Please add your POE API key in Settings.' 
+      error: 'API Key not configured.'
+    };
+  }
+
+  // MOCK MODE FOR TESTING
+  if (apiKey === 'mock') {
+    console.log('[Video API] MOCK MODE ACTIVE');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    return {
+      result: {
+        type: 'video',
+        status: 'completed',
+        content: 'Mock video response',
+        videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+        duration: videoConfig.duration,
+        prompt: prompt,
+        progress: 100,
+      }
     };
   }
 
   const modelConfig = VIDEO_MODELS.find(m => m.name === videoConfig.model);
-  if (!modelConfig) {
-    return { 
-      result: { type: 'text', status: 'failed', content: prompt, prompt },
-      error: 'Invalid video model selected' 
-    };
-  }
 
   try {
-    console.log('[Video API] ========== POE VIDEO GENERATION REQUEST ==========');
-    console.log('[Video API] Using POE Chat Completions API');
-    console.log('[Video API] Base URL:', settings.baseUrl);
-    console.log('[Video API] Video Model:', videoConfig.model);
-    console.log('[Video API] Prompt length:', prompt.length, 'chars');
-    
+    console.log('[Video API] ========== VIDEO GENERATION REQUEST ==========');
+    console.log('[Video API] Mode:', settings.apiMode);
+
     // Build the video generation prompt with parameters
-    // Include video settings in the prompt for the video model
     let videoPrompt = prompt;
-    
-    // Add video parameters to the prompt
     const videoParams = [];
-    if (videoConfig.duration) {
-      videoParams.push(`Duration: ${videoConfig.duration} seconds`);
-    }
-    if (videoConfig.width && videoConfig.height) {
-      videoParams.push(`Resolution: ${videoConfig.width}x${videoConfig.height}`);
-      const aspectRatio = videoConfig.width > videoConfig.height ? 'landscape (16:9)' : 
-                          videoConfig.width < videoConfig.height ? 'portrait (9:16)' : 'square (1:1)';
-      videoParams.push(`Aspect ratio: ${aspectRatio}`);
-    }
-    
+    if (videoConfig.duration) videoParams.push(`Duration: ${videoConfig.duration}s`);
+    if (videoConfig.width && videoConfig.height) videoParams.push(`Res: ${videoConfig.width}x${videoConfig.height}`);
+
     if (videoParams.length > 0) {
-      videoPrompt = `${prompt}\n\n[Video Parameters: ${videoParams.join(', ')}]`;
+      videoPrompt = `${prompt}\n\n[Specs: ${videoParams.join(', ')}]`;
     }
-    
-    // Add reference image if configured
+
+    // Prepare request message
     const messages: AIMessage[] = [];
-    
-    if (videoConfig.useImageReference && videoConfig.referenceImageUrl && modelConfig.supportsImageReference) {
-      // Use multimodal format with image
+    if (videoConfig.useImageReference && videoConfig.referenceImageUrl && modelConfig?.supportsImageReference) {
       messages.push({
         role: 'user',
         content: [
           { type: 'text', text: videoPrompt },
-          { 
-            type: 'image_url', 
-            image_url: { url: videoConfig.referenceImageUrl } 
-          }
+          { type: 'image_url', image_url: { url: videoConfig.referenceImageUrl } }
         ]
       });
-      console.log('[Video API] Including reference image:', videoConfig.referenceImageUrl);
     } else {
-      messages.push({
-        role: 'user',
-        content: videoPrompt
-      });
+      messages.push({ role: 'user', content: videoPrompt });
     }
 
     const requestBody = {
@@ -396,54 +388,43 @@ export async function createVideoTask(
       temperature: 0.7,
     };
 
-    console.log('[Video API] Request model:', requestBody.model);
-    console.log('[Video API] Calling POE API:', `${settings.baseUrl}/chat/completions`);
-    
-    const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+    const apiUrl = `${baseUrl}/chat/completions`;
+    console.log('[Video API] Calling API:', apiUrl);
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(requestBody),
     });
-    
-    console.log('[Video API] Response status:', response.status, response.statusText);
-    
-    const responseText = await response.text();
-    console.log('[Video API] Response body:', responseText.substring(0, 1000));
 
+    const responseText = await response.text();
     if (!response.ok) {
-      let errorMessage = `POE API Error: ${response.status}`;
-      try {
-        const errorData = JSON.parse(responseText);
-        errorMessage = errorData.error?.message || errorData.message || JSON.stringify(errorData);
-      } catch {
-        errorMessage = responseText || errorMessage;
-      }
-      console.error('[Video API] Error:', errorMessage);
-      return { 
+      return {
         result: { type: 'text', status: 'failed', content: prompt, prompt },
-        error: errorMessage 
+        error: `API Error: ${response.status}`
       };
     }
+
 
     let data;
     try {
       data = JSON.parse(responseText);
     } catch {
-      return { 
+      return {
         result: { type: 'text', status: 'failed', content: prompt, prompt },
-        error: 'Invalid response from POE API' 
+        error: 'Invalid response from AI API'
       };
     }
-    
+
     const responseContent = data.choices?.[0]?.message?.content || '';
     console.log('[Video API] Response content:', responseContent.substring(0, 500));
 
     // Try to parse video URL from the response
     const videoUrl = parseVideoUrlFromResponse(responseContent);
-    
+
     if (videoUrl) {
       console.log('[Video API] SUCCESS - Video URL found:', videoUrl);
       return {
@@ -458,7 +439,7 @@ export async function createVideoTask(
         }
       };
     }
-    
+
     // No video URL found - return the text content
     // This might happen if the model doesn't support video or returns text instead
     console.log('[Video API] No video URL found, returning text response');
@@ -473,29 +454,45 @@ export async function createVideoTask(
     };
   } catch (err) {
     console.error('[Video API] Exception:', err);
-    return { 
+    return {
       result: { type: 'text', status: 'failed', content: prompt, prompt },
-      error: String(err) 
+      error: String(err)
     };
   }
 }
 
-// Poll video task status - Not needed for POE API (synchronous)
-// Kept for API compatibility
+// Poll video task status
 export async function pollVideoTask(
   taskId: string,
-  _settings: Settings // Unused - POE API is synchronous
+  settings: Settings
 ): Promise<VideoResponse> {
-  // POE API is synchronous, no polling needed
-  // This function is kept for API compatibility
-  console.log('[Video API] pollVideoTask called but POE API is synchronous');
+  const isInternal = settings.apiMode === 'internal';
+  const baseUrl = isInternal ? INTERNAL_API_CONFIG.baseUrl : settings.baseUrl;
+  const apiKey = isInternal ? INTERNAL_API_CONFIG.apiKey : settings.apiKey;
+
+  console.log(`[Video API] Polling task ${taskId} at ${baseUrl}`);
+
+  // MOCK MODE
+  if (apiKey === 'mock') {
+    return {
+      result: {
+        type: 'video',
+        status: 'completed',
+        content: 'Mock polled video response',
+        videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+        progress: 100,
+      }
+    };
+  }
+
+  // Implementation varies by provider. For now, returning pending/stub
   return {
     result: {
-      type: 'text',
-      status: 'completed',
-      content: 'POE API does not require polling - responses are synchronous',
+      type: 'pending',
+      status: 'processing',
+      content: 'Polling Not Fully Implemented for this provider',
       taskId: taskId,
-      progress: 100,
+      progress: 50,
     }
   };
 }
@@ -511,10 +508,10 @@ export async function generateVideo(
 ): Promise<VideoResponse> {
   console.log('[generateVideo] ========== VIDEO GENERATION STARTED ==========');
   console.log('[generateVideo] Step 1: Generating video prompt using Text AI...');
-  
+
   // Step 1: Generate the video prompt using text AI
   const promptResult = await generateVideoPrompt(productDescription, videoSystemPrompt, settings);
-  
+
   if (promptResult.error || !promptResult.prompt) {
     console.error('[generateVideo] Step 1 FAILED:', promptResult.error);
     return {
@@ -522,19 +519,19 @@ export async function generateVideo(
       error: promptResult.error || 'Failed to generate video prompt'
     };
   }
-  
+
   console.log('[generateVideo] Step 1 SUCCESS - Prompt generated');
-  console.log('[generateVideo] Step 2: Calling POE Video Model...');
+  console.log('[generateVideo] Step 2: Calling Video Model...');
   console.log('[generateVideo] Video Model:', videoConfig.model);
 
   // Step 2: Call the video model with the generated prompt
   const videoResult = await createVideoTask(promptResult.prompt, videoConfig, settings);
-  
+
   console.log('[generateVideo] Step 2 Result:', videoResult.error ? 'FAILED' : 'SUCCESS');
   if (videoResult.error) {
     console.error('[generateVideo] Step 2 Error:', videoResult.error.substring(0, 200));
   }
-  
+
   // Preserve the generated prompt in the result
   if (videoResult.result) {
     videoResult.result.prompt = promptResult.prompt;

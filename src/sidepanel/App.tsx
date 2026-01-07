@@ -3,7 +3,7 @@ import { useSettings } from '@/hooks/useSettings';
 import { useAI } from '@/hooks/useAI';
 import { useSession } from '@/hooks/useSession';
 import { useXoobay } from '@/hooks/useXoobay';
-import { PageContent, AVAILABLE_MODELS, ImageInfo, AIConfig, DEFAULT_AI_CONFIG, VideoConfig, DEFAULT_VIDEO_CONFIG, VIDEO_MODELS, VideoModel, XoobayLanguage } from '@/types';
+import { PageContent, ImageInfo, AIConfig, DEFAULT_AI_CONFIG, VideoConfig, DEFAULT_VIDEO_CONFIG, VideoModel, XoobayLanguage, PROVIDER_MODELS, AVAILABLE_MODELS, VIDEO_MODELS } from '@/types';
 import { buildSystemPrompt, OUTPUT_LANGUAGES, OUTPUT_FORMATS, REASONING_LEVELS, buildVideoSystemPrompt, VIDEO_OUTPUT_LANGUAGES, VIDEO_STYLES } from '@/utils/templates';
 
 type Step = 'read' | 'edit' | 'config' | 'result';
@@ -11,19 +11,29 @@ type ResultView = 'rendered' | 'raw';
 type ConfigMode = 'text' | 'video';
 type SidePanel = 'sessions' | 'media' | null;
 
+const PROVIDERS_LIST = [
+  { id: 'doubao', name: 'Doubao', company: '字节跳动', icon: '🍃', color: 'bg-emerald-500', desc: '高效全能' },
+  { id: 'gpt', name: 'OpenAI', company: 'ChatGPT', icon: '🤖', color: 'bg-emerald-600', desc: '行业标杆' },
+  { id: 'anthropic', name: 'Anthropic', company: 'Claude', icon: '🎭', color: 'bg-orange-600', desc: '长篇理解' },
+  { id: 'gemini', name: 'Google', company: 'Gemini', icon: '✨', color: 'bg-blue-500', desc: '多模态强' },
+  { id: 'grok', name: 'xAI', company: 'Grok', icon: '🌌', color: 'bg-purple-600', desc: '实时互联' },
+  { id: 'perplexity', name: 'Perplexity', company: 'Search', icon: '🔍', color: 'bg-cyan-500', desc: '百科全书' },
+  { id: 'qwen', name: 'Qwen', company: '通义千问', icon: '☁️', color: 'bg-indigo-500', desc: '逻辑严密' },
+];
+
 export const App: React.FC = () => {
   const { settings, updateSettings, loading: settingsLoading } = useSettings();
   const { sendPrompt, sendVideoRequest, loading: aiLoading, error: aiError, result: aiResult, videoResult, videoPolling, clearResult, stopPolling } = useAI();
-  const { 
-    loading: xoobayLoading, 
-    error: xoobayError, 
-    products: xoobayProducts, 
-    currentPage: xoobayPage, 
+  const {
+    loading: xoobayLoading,
+    error: xoobayError,
+    products: xoobayProducts,
+    currentPage: xoobayPage,
     totalPages: xoobayTotalPages,
     searchProducts,
     loadProductAsPageContent,
   } = useXoobay();
-  
+
   // Session management
   const {
     sessions,
@@ -53,32 +63,32 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [resultView, setResultView] = useState<ResultView>('rendered');
   const [editTab, setEditTab] = useState<'text' | 'images'>('text');
-  
+
   // XOOBAY related state
   const [xoobaySearchTerm, setXoobaySearchTerm] = useState('');
   const [xoobayLang, setXoobayLang] = useState<XoobayLanguage>('zh_cn');
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  
+
   // Side panel state
   const [sidePanel, setSidePanel] = useState<SidePanel>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionName, setEditingSessionName] = useState('');
   const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
   const [editingMediaName, setEditingMediaName] = useState('');
-  
+
   // Config mode: text generation vs video generation
   const [configMode, setConfigMode] = useState<ConfigMode>('text');
-  
+
   // AI Config State (for text generation) - synced with session
   const [aiConfig, setAiConfig] = useState<AIConfig>({
     ...DEFAULT_AI_CONFIG,
-    systemPrompt: buildSystemPrompt('auto', 'markdown', 'medium', false),
+    systemPrompt: buildSystemPrompt('auto', 'markdown', 'medium', false, settings?.brandName, settings?.companyName),
   });
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
-  
+
   // Video Config State - synced with session
   const [videoConfig, setVideoConfig] = useState<VideoConfig>(DEFAULT_VIDEO_CONFIG);
-  
+
   // Sync local config with session config ONLY when session ID changes (not on every config update)
   useEffect(() => {
     if (activeSession && activeSessionId) {
@@ -92,10 +102,10 @@ export const App: React.FC = () => {
     // Only depend on activeSessionId - not on config objects to avoid resetting editedContent
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId]);
-  
+
   // Update session config when local config changes (debounced to avoid loops)
   const configUpdateTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   useEffect(() => {
     if (activeSession && !sessionLoading) {
       // Debounce config updates to avoid too many writes
@@ -113,7 +123,7 @@ export const App: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiConfig]);
-  
+
   useEffect(() => {
     if (activeSession && !sessionLoading) {
       updateSessionVideoConfig(videoConfig);
@@ -127,27 +137,29 @@ export const App: React.FC = () => {
       aiConfig.outputLanguage,
       aiConfig.outputFormat,
       aiConfig.reasoningEffort,
-      aiConfig.enableWebSearch
+      aiConfig.enableWebSearch,
+      settings.brandName,
+      settings.companyName
     );
-  }, [aiConfig.outputLanguage, aiConfig.outputFormat, aiConfig.reasoningEffort, aiConfig.enableWebSearch]);
+  }, [aiConfig.outputLanguage, aiConfig.outputFormat, aiConfig.reasoningEffort, aiConfig.enableWebSearch, settings.brandName, settings.companyName]);
 
   // Update aiConfig.systemPrompt when finalSystemPrompt changes
   useEffect(() => {
     setAiConfig(c => ({ ...c, systemPrompt: finalSystemPrompt }));
   }, [finalSystemPrompt]);
-  
+
   // Get current video model config
   const currentVideoModel = useMemo(() => {
     return VIDEO_MODELS.find(m => m.name === videoConfig.model) || VIDEO_MODELS[0];
   }, [videoConfig.model]);
-  
+
   // Calculate aspect ratio string from width/height
   const getAspectRatio = (w: number, h: number): string => {
     if (w === h) return '1:1';
-    if (w > h) return `${Math.round(w/h * 9)}:9`;
-    return `9:${Math.round(h/w * 9)}`;
+    if (w > h) return `${Math.round(w / h * 9)}:9`;
+    return `9:${Math.round(h / w * 9)}`;
   };
-  
+
   // Build video system prompt when video config changes
   const finalVideoSystemPrompt = useMemo(() => {
     const aspectRatio = getAspectRatio(videoConfig.width, videoConfig.height);
@@ -165,12 +177,12 @@ export const App: React.FC = () => {
       referenceImageUrl: videoConfig.referenceImageUrl,
     });
   }, [videoConfig, currentVideoModel]);
-  
+
   // Update videoConfig.systemPrompt when finalVideoSystemPrompt changes
   useEffect(() => {
     setVideoConfig(c => ({ ...c, systemPrompt: finalVideoSystemPrompt }));
   }, [finalVideoSystemPrompt]);
-  
+
   // Update video config when model changes (reset to model defaults)
   const handleVideoModelChange = (modelName: VideoModel) => {
     const model = VIDEO_MODELS.find(m => m.name === modelName);
@@ -268,7 +280,7 @@ export const App: React.FC = () => {
     if (!pageContent) return;
     const img = pageContent.images[index];
     const isSelected = selectedImages.some(i => i.src === img.src);
-    
+
     if (isSelected) {
       setSelectedImages(selectedImages.filter(i => i.src !== img.src));
     } else {
@@ -297,7 +309,7 @@ export const App: React.FC = () => {
         outputFormat: 'markdown',
         reasoningEffort: 'medium',
         enableWebSearch: false,
-        systemPrompt: buildSystemPrompt('auto', 'markdown', 'medium', false),
+        systemPrompt: buildSystemPrompt('auto', 'markdown', 'medium', false, settings.brandName, settings.companyName),
       });
     } else {
       setVideoConfig(DEFAULT_VIDEO_CONFIG);
@@ -307,7 +319,7 @@ export const App: React.FC = () => {
   const handleSendToAI = async () => {
     // Build user content with images
     let userContent = editedContent;
-    
+
     if (selectedImages.length > 0) {
       userContent += '\n\n---\n\n## Images on this page:\n\n';
       selectedImages.forEach((img, index) => {
@@ -317,11 +329,11 @@ export const App: React.FC = () => {
         userContent += '\n';
       });
     }
-    
+
     if (configMode === 'video') {
       // Use video generation
       const result = await sendVideoRequest(userContent, finalVideoSystemPrompt, videoConfig, settings);
-      
+
       // Save to media library if successful (result is VideoGenerationResult directly)
       if (result && result.status === 'completed') {
         const mediaType = result.type === 'video' ? 'video' : 'text';
@@ -348,11 +360,11 @@ export const App: React.FC = () => {
     }
     setStep('result');
   };
-  
+
   // Save text result to media library
   const handleSaveTextToLibrary = () => {
     if (!aiResult) return;
-    
+
     addMediaItem({
       type: 'text',
       name: `📝 ${pageContent?.title?.substring(0, 30) || 'Text'} - ${new Date().toLocaleString()}`,
@@ -598,7 +610,7 @@ export const App: React.FC = () => {
         elements.push(<p key={index} className="text-dark-200 my-2 leading-relaxed">{renderInlineMarkdown(trimmed)}</p>);
       }
     });
-    
+
     flushList();
     flushOrderedList();
     flushBlockquote();
@@ -613,11 +625,11 @@ export const App: React.FC = () => {
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/on\w+="[^"]*"/gi, '')
       .replace(/on\w+='[^']*'/gi, '');
-    
+
     return (
-      <div 
+      <div
         className="prose prose-invert max-w-none prose-headings:text-white prose-p:text-dark-200 prose-a:text-primary-400 prose-strong:text-white prose-code:text-amber-400 prose-code:bg-dark-800 prose-code:px-1 prose-code:rounded"
-        dangerouslySetInnerHTML={{ __html: sanitized }} 
+        dangerouslySetInnerHTML={{ __html: sanitized }}
       />
     );
   };
@@ -753,18 +765,18 @@ export const App: React.FC = () => {
   // Get current config summary
   const getConfigSummary = () => {
     const parts: string[] = [];
-    
+
     const lang = OUTPUT_LANGUAGES.find(l => l.code === aiConfig.outputLanguage);
     if (lang) parts.push(`🌐 ${lang.label}`);
-    
+
     const fmt = OUTPUT_FORMATS.find(f => f.code === aiConfig.outputFormat);
     if (fmt) parts.push(`${fmt.icon} ${fmt.label}`);
-    
+
     const reason = REASONING_LEVELS.find(r => r.value === aiConfig.reasoningEffort);
     if (reason) parts.push(`🧠 ${reason.label}`);
-    
+
     if (aiConfig.enableWebSearch) parts.push('🔍 Web');
-    
+
     return parts.join(' • ');
   };
 
@@ -781,342 +793,514 @@ export const App: React.FC = () => {
       <div className="w-full p-2 lg:max-w-6xl lg:mx-auto lg:p-4">
         {/* Header */}
         <header className="px-3 py-2.5 lg:px-4 lg:py-3 border-b border-dark-800 bg-dark-900/80 flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
             </div>
-          <div>
-            <h1 className="text-base font-bold text-white">AI SEO</h1>
-            <p className="text-xs text-dark-400 truncate max-w-32" title={activeSession?.name}>
-              {activeSession?.name || settings.model}
-            </p>
+            <div>
+              <h1 className="text-base font-bold text-white">AI SEO</h1>
+              <p className="text-xs text-dark-400 truncate max-w-32" title={activeSession?.name}>
+                {activeSession?.name || settings.model}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1">
-          {/* Sessions Button */}
-          <button
-            onClick={() => setSidePanel(sidePanel === 'sessions' ? null : 'sessions')}
-            className={`p-2 rounded-lg transition-colors ${sidePanel === 'sessions' ? 'bg-blue-500/20 text-blue-400' : 'text-dark-400 hover:bg-dark-800'}`}
-            title="Sessions"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          </button>
-          {/* Media Library Button - folder/collection icon */}
-          <button
-            onClick={() => setSidePanel(sidePanel === 'media' ? null : 'media')}
-            className={`p-2 rounded-lg transition-colors relative ${sidePanel === 'media' ? 'bg-purple-500/20 text-purple-400' : 'text-dark-400 hover:bg-dark-800'}`}
-            title="My Library"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            {mediaLibrary.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                {mediaLibrary.length}
-              </span>
-            )}
-          </button>
-          {/* Settings Button */}
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-primary-500/20 text-primary-400' : 'text-dark-400 hover:bg-dark-800'}`}
-            title="Settings"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
-      </header>
-      
-      {/* Side Panel - Sessions & Media Library */}
-      {sidePanel && (
-        <div className="border-b border-dark-800 bg-dark-900/80 animate-fadeIn">
-          {/* Sessions Panel */}
-          {sidePanel === 'sessions' && (
-            <div className="p-3 space-y-2 max-h-64 overflow-y-auto">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-blue-400">📁 Sessions</h3>
-                <button
-                  onClick={() => createSession()}
-                  className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
-                >
-                  + New
-                </button>
-              </div>
-              {sessions.map(session => (
-                <div
-                  key={session.id}
-                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
-                    session.id === activeSessionId 
-                      ? 'bg-blue-500/20 border border-blue-500/50' 
+          <div className="flex items-center gap-1">
+            {/* Sessions Button */}
+            <button
+              onClick={() => setSidePanel(sidePanel === 'sessions' ? null : 'sessions')}
+              className={`p-2 rounded-lg transition-colors ${sidePanel === 'sessions' ? 'bg-blue-500/20 text-blue-400' : 'text-dark-400 hover:bg-dark-800'}`}
+              title="Sessions"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            </button>
+            {/* Media Library Button - folder/collection icon */}
+            <button
+              onClick={() => setSidePanel(sidePanel === 'media' ? null : 'media')}
+              className={`p-2 rounded-lg transition-colors relative ${sidePanel === 'media' ? 'bg-purple-500/20 text-purple-400' : 'text-dark-400 hover:bg-dark-800'}`}
+              title="My Library"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              {mediaLibrary.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                  {mediaLibrary.length}
+                </span>
+              )}
+            </button>
+            {/* Settings Button */}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-primary-500/20 text-primary-400' : 'text-dark-400 hover:bg-dark-800'}`}
+              title="Settings"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        {/* Side Panel - Sessions & Media Library */}
+        {sidePanel && (
+          <div className="border-b border-dark-800 bg-dark-900/80 animate-fadeIn">
+            {/* Sessions Panel */}
+            {sidePanel === 'sessions' && (
+              <div className="p-3 space-y-2 max-h-64 overflow-y-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-blue-400">📁 Sessions</h3>
+                  <button
+                    onClick={() => createSession()}
+                    className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
+                  >
+                    + New
+                  </button>
+                </div>
+                {sessions.map(session => (
+                  <div
+                    key={session.id}
+                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${session.id === activeSessionId
+                      ? 'bg-blue-500/20 border border-blue-500/50'
                       : 'bg-dark-800/50 border border-dark-700/50 hover:bg-dark-800'
-                  }`}
-                >
-                  {editingSessionId === session.id ? (
-                    <input
-                      type="text"
-                      value={editingSessionName}
-                      onChange={(e) => setEditingSessionName(e.target.value)}
-                      onBlur={() => {
-                        if (editingSessionName.trim()) {
-                          renameSession(session.id, editingSessionName.trim());
-                        }
-                        setEditingSessionId(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                      }`}
+                  >
+                    {editingSessionId === session.id ? (
+                      <input
+                        type="text"
+                        value={editingSessionName}
+                        onChange={(e) => setEditingSessionName(e.target.value)}
+                        onBlur={() => {
                           if (editingSessionName.trim()) {
                             renameSession(session.id, editingSessionName.trim());
                           }
                           setEditingSessionId(null);
-                        } else if (e.key === 'Escape') {
-                          setEditingSessionId(null);
-                        }
-                      }}
-                      className="flex-1 px-2 py-1 bg-dark-700 border border-dark-600 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      autoFocus
-                    />
-                  ) : (
-                    <>
-                      <div 
-                        className="flex-1 min-w-0"
-                        onClick={() => switchSession(session.id)}
-                      >
-                        <p className="text-sm text-white truncate">{session.name}</p>
-                        <p className="text-xs text-dark-500 truncate">
-                          {session.mediaLibrary.length} items • {new Date(session.updatedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingSessionId(session.id);
-                          setEditingSessionName(session.name);
                         }}
-                        className="p-1 text-dark-400 hover:text-white transition-colors"
-                        title="Rename"
-                      >
-                        ✏️
-                      </button>
-                      {sessions.length > 1 && (
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (editingSessionName.trim()) {
+                              renameSession(session.id, editingSessionName.trim());
+                            }
+                            setEditingSessionId(null);
+                          } else if (e.key === 'Escape') {
+                            setEditingSessionId(null);
+                          }
+                        }}
+                        className="flex-1 px-2 py-1 bg-dark-700 border border-dark-600 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        <div
+                          className="flex-1 min-w-0"
+                          onClick={() => switchSession(session.id)}
+                        >
+                          <p className="text-sm text-white truncate">{session.name}</p>
+                          <p className="text-xs text-dark-500 truncate">
+                            {session.mediaLibrary.length} items • {new Date(session.updatedAt).toLocaleDateString()}
+                          </p>
+                        </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm('Delete this session?')) {
-                              deleteSession(session.id);
-                            }
+                            setEditingSessionId(session.id);
+                            setEditingSessionName(session.name);
                           }}
+                          className="p-1 text-dark-400 hover:text-white transition-colors"
+                          title="Rename"
+                        >
+                          ✏️
+                        </button>
+                        {sessions.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('Delete this session?')) {
+                                deleteSession(session.id);
+                              }
+                            }}
+                            className="p-1 text-dark-400 hover:text-red-400 transition-colors"
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* My Library Panel */}
+            {sidePanel === 'media' && (
+              <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-purple-400">📚 My Library</h3>
+                  {mediaLibrary.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (confirm('Clear all media items?')) {
+                          clearMediaLibrary();
+                        }
+                      }}
+                      className="px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+                {mediaLibrary.length === 0 ? (
+                  <p className="text-xs text-dark-500 text-center py-4">
+                    No media yet. Generate videos or text to populate your library.
+                  </p>
+                ) : (
+                  mediaLibrary.map(item => (
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-2 p-2 bg-dark-800/50 border border-dark-700/50 rounded-lg hover:bg-dark-800 transition-all"
+                    >
+                      {/* Thumbnail/Icon */}
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${item.type === 'video' ? 'bg-purple-500/20' : 'bg-green-500/20'
+                        }`}>
+                        {item.type === 'video' ? '🎬' : '📝'}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        {editingMediaId === item.id ? (
+                          <input
+                            type="text"
+                            value={editingMediaName}
+                            onChange={(e) => setEditingMediaName(e.target.value)}
+                            onBlur={() => {
+                              if (editingMediaName.trim()) {
+                                renameMediaItem(item.id, editingMediaName.trim());
+                              }
+                              setEditingMediaId(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                if (editingMediaName.trim()) {
+                                  renameMediaItem(item.id, editingMediaName.trim());
+                                }
+                                setEditingMediaId(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingMediaId(null);
+                              }
+                            }}
+                            className="w-full px-2 py-1 bg-dark-700 border border-dark-600 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            autoFocus
+                          />
+                        ) : (
+                          <p className="text-sm text-white truncate">{item.name}</p>
+                        )}
+                        <p className="text-xs text-dark-500 truncate">{item.metadata.model}</p>
+                        {item.type === 'video' && item.metadata.duration && (
+                          <p className="text-xs text-purple-400">{item.metadata.duration}s • {item.metadata.width}x{item.metadata.height}</p>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex flex-col gap-1">
+                        {item.type === 'video' && item.videoUrl && (
+                          <a
+                            href={item.videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 text-purple-400 hover:bg-purple-500/20 rounded transition-colors"
+                            title="Open Video"
+                          >
+                            ▶️
+                          </a>
+                        )}
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(item.content || item.videoUrl || '');
+                          }}
+                          className="p-1 text-dark-400 hover:text-white transition-colors"
+                          title="Copy"
+                        >
+                          📋
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingMediaId(item.id);
+                            setEditingMediaName(item.name);
+                          }}
+                          className="p-1 text-dark-400 hover:text-white transition-colors"
+                          title="Rename"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => removeMediaItem(item.id)}
                           className="p-1 text-dark-400 hover:text-red-400 transition-colors"
                           title="Delete"
                         >
                           🗑️
                         </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {/* My Library Panel */}
-          {sidePanel === 'media' && (
-            <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-purple-400">📚 My Library</h3>
-                {mediaLibrary.length > 0 && (
-                  <button
-                    onClick={() => {
-                      if (confirm('Clear all media items?')) {
-                        clearMediaLibrary();
-                      }
-                    }}
-                    className="px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                  >
-                    Clear All
-                  </button>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
-              {mediaLibrary.length === 0 ? (
-                <p className="text-xs text-dark-500 text-center py-4">
-                  No media yet. Generate videos or text to populate your library.
-                </p>
-              ) : (
-                mediaLibrary.map(item => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-2 p-2 bg-dark-800/50 border border-dark-700/50 rounded-lg hover:bg-dark-800 transition-all"
-                  >
-                    {/* Thumbnail/Icon */}
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      item.type === 'video' ? 'bg-purple-500/20' : 'bg-green-500/20'
-                    }`}>
-                      {item.type === 'video' ? '🎬' : '📝'}
+            )}
+          </div>
+        )}
+
+        {/* Settings Panel */}
+        {showSettings && (
+          <div className="p-4 border-b border-dark-800 bg-dark-900/50 space-y-4 animate-fadeIn max-h-96 overflow-y-auto">
+            {/* Internal vs Custom Mode */}
+            <div className="p-3 bg-dark-800/50 rounded-xl border border-dark-700/50 space-y-3">
+              <h4 className="text-xs font-semibold text-primary-400 flex items-center gap-2">
+                🏢 Commercial Config
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => updateSettings({ apiMode: 'internal' })}
+                  className={`px-3 py-2 text-xs rounded-lg transition-all ${settings.apiMode === 'internal' ? 'bg-primary-500 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
+                >
+                  Internal Mode
+                </button>
+                <button
+                  onClick={() => updateSettings({ apiMode: 'custom' })}
+                  className={`px-3 py-2 text-xs rounded-lg transition-all ${settings.apiMode === 'custom' ? 'bg-primary-500 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
+                >
+                  DIY Mode (Custom)
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-dark-400 mb-1.5">Company Name</label>
+                  <input
+                    type="text"
+                    value={settings.companyName}
+                    onChange={(e) => updateSettings({ companyName: e.target.value })}
+                    placeholder="Your Company"
+                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-dark-400 mb-1.5">Brand Name</label>
+                  <input
+                    type="text"
+                    value={settings.brandName}
+                    onChange={(e) => updateSettings({ brandName: e.target.value })}
+                    placeholder="Your Brand"
+                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* AI Provider Settings */}
+            <div className={`p-4 rounded-xl border space-y-4 ${settings.apiMode === 'internal' ? 'bg-primary-500/5 border-primary-500/20' : 'bg-dark-800/50 border-dark-700/50'}`}>
+              {settings.apiMode === 'internal' ? (
+                /* --- INTERNAL MODE UI --- */
+                <>
+                  <h4 className="text-xs font-semibold text-primary-400 flex items-center gap-2">
+                    🏢 Corporate AI Agents
+                  </h4>
+
+                  {/* Premium Visual Provider Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {PROVIDERS_LIST.map((p) => {
+                      const isSelected = settings.provider === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            const firstModel = PROVIDER_MODELS[p.id]?.[0] || '';
+                            updateSettings({ provider: p.id as any, model: firstModel });
+                          }}
+                          className={`group relative flex flex-col items-center p-3 rounded-2xl border transition-all duration-500 overflow-hidden ${isSelected
+                            ? `bg-dark-800 border-primary-500 ring-2 ring-primary-500/20 shadow-xl shadow-primary-500/10`
+                            : 'bg-dark-800/20 border-dark-700/50 hover:bg-dark-800/60 hover:border-dark-500'}`}
+                        >
+                          {isSelected && <div className={`absolute inset-0 opacity-10 blur-xl ${p.color}`} />}
+                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-2xl mb-2.5 transition-all duration-500 group-hover:rotate-6 group-hover:scale-110 ${isSelected ? p.color + ' shadow-lg shadow-' + p.color.split('-')[1] + '-500/40' : 'bg-dark-700/50 text-dark-300'}`}>
+                            {p.icon}
+                          </div>
+                          <span className={`text-[11px] font-bold tracking-tight ${isSelected ? 'text-white' : 'text-dark-300'}`}>{p.name}</span>
+                          <span className="text-[8px] text-dark-500 mt-0.5 uppercase tracking-wider">{p.company}</span>
+                          {isSelected && (
+                            <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center shadow-md animate-scaleIn">
+                              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Internal Info Box */}
+                  <div className="p-2.5 bg-primary-500/10 border border-primary-500/20 rounded-lg flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary-500/20 flex items-center justify-center text-primary-400 shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                     </div>
-                    
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      {editingMediaId === item.id ? (
+                    <p className="text-[10px] text-primary-400 leading-tight">
+                      <strong>Internal Mode Active:</strong> API routing and authentication are managed automatically.
+                    </p>
+                  </div>
+
+                  {/* Model Selection (Filtered by Provider) */}
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-1.5 font-medium">Model Variant</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={settings.model}
+                        onChange={(e) => {
+                          if (e.target.value !== 'custom') {
+                            updateSettings({ model: e.target.value });
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 bg-dark-800 border border-primary-500/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      >
+                        {(PROVIDER_MODELS[settings.provider] || []).map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                        <option value="custom">-- Custom / Other --</option>
+                      </select>
+                      {(!(PROVIDER_MODELS[settings.provider] || []).includes(settings.model) || settings.model === 'custom') && (
                         <input
                           type="text"
-                          value={editingMediaName}
-                          onChange={(e) => setEditingMediaName(e.target.value)}
-                          onBlur={() => {
-                            if (editingMediaName.trim()) {
-                              renameMediaItem(item.id, editingMediaName.trim());
-                            }
-                            setEditingMediaId(null);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              if (editingMediaName.trim()) {
-                                renameMediaItem(item.id, editingMediaName.trim());
-                              }
-                              setEditingMediaId(null);
-                            } else if (e.key === 'Escape') {
-                              setEditingMediaId(null);
-                            }
-                          }}
-                          className="w-full px-2 py-1 bg-dark-700 border border-dark-600 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-                          autoFocus
+                          value={settings.model === 'custom' ? '' : settings.model}
+                          onChange={(e) => updateSettings({ model: e.target.value })}
+                          placeholder="Enter model name"
+                          className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                         />
-                      ) : (
-                        <p className="text-sm text-white truncate">{item.name}</p>
                       )}
-                      <p className="text-xs text-dark-500 truncate">{item.metadata.model}</p>
-                      {item.type === 'video' && item.metadata.duration && (
-                        <p className="text-xs text-purple-400">{item.metadata.duration}s • {item.metadata.width}x{item.metadata.height}</p>
-                      )}
-                    </div>
-                    
-                    {/* Actions */}
-                    <div className="flex flex-col gap-1">
-                      {item.type === 'video' && item.videoUrl && (
-                        <a
-                          href={item.videoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1 text-purple-400 hover:bg-purple-500/20 rounded transition-colors"
-                          title="Open Video"
-                        >
-                          ▶️
-                        </a>
-                      )}
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(item.content || item.videoUrl || '');
-                        }}
-                        className="p-1 text-dark-400 hover:text-white transition-colors"
-                        title="Copy"
-                      >
-                        📋
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingMediaId(item.id);
-                          setEditingMediaName(item.name);
-                        }}
-                        className="p-1 text-dark-400 hover:text-white transition-colors"
-                        title="Rename"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => removeMediaItem(item.id)}
-                        className="p-1 text-dark-400 hover:text-red-400 transition-colors"
-                        title="Delete"
-                      >
-                        🗑️
-                      </button>
                     </div>
                   </div>
-                ))
+                </>
+              ) : (
+                /* --- DIY MODE UI (Original Flow) --- */
+                <>
+                  <h4 className="text-xs font-semibold text-amber-500 flex items-center gap-2">
+                    🛠️ Manual API Configuration
+                  </h4>
+
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-1.5 uppercase tracking-wider">AI Provider</label>
+                    <select
+                      value={settings.provider}
+                      onChange={(e) => {
+                        const newProvider = e.target.value as any;
+                        const firstModel = PROVIDER_MODELS[newProvider]?.[0] || '';
+                        updateSettings({ provider: newProvider, model: firstModel });
+                      }}
+                      className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all hover:border-dark-600"
+                    >
+                      {PROVIDERS_LIST.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.company})</option>
+                      ))}
+                      {/* Backward compatibility for old providers not in grid */}
+                      {!PROVIDERS_LIST.find(p => p.id === settings.provider) && (
+                        <option value={settings.provider}>{settings.provider}</option>
+                      )}
+                    </select>
+                  </div>
+
+                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[10px] text-amber-400 leading-tight">
+                    Tip: Enter <strong>mock</strong> as API Key to test UI without consuming credits.
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-xs text-dark-400 mb-1.5">API Key</label>
+                      <input
+                        type="password"
+                        value={settings.apiKey}
+                        onChange={(e) => updateSettings({ apiKey: e.target.value })}
+                        placeholder="Enter your API key"
+                        className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-dark-400 mb-1.5">Base URL</label>
+                      <input
+                        type="text"
+                        value={settings.baseUrl}
+                        onChange={(e) => updateSettings({ baseUrl: e.target.value })}
+                        placeholder="https://api.openai.com/v1"
+                        className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-1.5 font-medium uppercase tracking-wider">Target Model</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={settings.model}
+                        onChange={(e) => {
+                          if (e.target.value !== 'custom') {
+                            updateSettings({ model: e.target.value });
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      >
+                        {AVAILABLE_MODELS.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                        <option value="custom">-- Custom / Other --</option>
+                      </select>
+                      {(settings.model === 'custom' || !AVAILABLE_MODELS.includes(settings.model)) && (
+                        <input
+                          type="text"
+                          value={settings.model === 'custom' ? '' : settings.model}
+                          onChange={(e) => updateSettings({ model: e.target.value })}
+                          placeholder="Enter model name"
+                          className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
-          )}
+
+            {/* Video AI Info */}
+            <div className="p-3 bg-purple-900/20 rounded-xl border border-purple-700/50">
+              <h4 className="text-xs font-semibold text-purple-400 flex items-center gap-2 mb-2">
+                🎬 Video Generation
+              </h4>
+              <p className="text-xs text-dark-400">
+                Video generation uses the same POE API key. Select a video model in Step 3 (Video Mode) to generate videos.
+              </p>
+              <p className="text-xs text-dark-500 mt-2">
+                Available video models: Sora, Veo, Runway, Kling, Hailuo, Pika, Luma
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Progress Steps */}
+        <div className="px-3 py-2.5 lg:px-4 lg:py-3 border-b border-dark-800 flex gap-2 mb-4 overflow-x-auto">
+          {(['read', 'edit', 'config', 'result'] as Step[]).map((s, i) => (
+            <div key={s} className="flex items-center gap-2">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+              ${step === s ? 'bg-primary-500 text-white' :
+                  ['read', 'edit', 'config', 'result'].indexOf(step) > i ? 'bg-emerald-500 text-white' : 'bg-dark-700 text-dark-400'}`}>
+                {i + 1}
+              </div>
+              <span className={`text-xs ${step === s ? 'text-white' : 'text-dark-400'}`}>
+                {s === 'read' ? 'Read' : s === 'edit' ? 'Edit' : s === 'config' ? 'Config' : 'Result'}
+              </span>
+              {i < 3 && <div className="w-4 h-px bg-dark-700" />}
+            </div>
+          ))}
         </div>
-      )}
 
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="p-4 border-b border-dark-800 bg-dark-900/50 space-y-4 animate-fadeIn max-h-96 overflow-y-auto">
-          {/* Text AI Settings */}
-          <div className="p-3 bg-dark-800/50 rounded-xl border border-dark-700/50 space-y-3">
-            <h4 className="text-xs font-semibold text-primary-400 flex items-center gap-2">
-              📝 Text AI (POE / OpenAI Compatible)
-            </h4>
-            <div>
-              <label className="block text-xs text-dark-400 mb-1.5">API Key</label>
-              <input
-                type="password"
-                value={settings.apiKey}
-                onChange={(e) => updateSettings({ apiKey: e.target.value })}
-                placeholder="Enter your API key"
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-dark-400 mb-1.5">Base URL</label>
-              <input
-                type="text"
-                value={settings.baseUrl}
-                onChange={(e) => updateSettings({ baseUrl: e.target.value })}
-                placeholder="https://api.poe.com/v1"
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-dark-400 mb-1.5">Model</label>
-              <select
-                value={settings.model}
-                onChange={(e) => updateSettings({ model: e.target.value })}
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              >
-                {AVAILABLE_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-          </div>
-          
-          {/* Video AI Info */}
-          <div className="p-3 bg-purple-900/20 rounded-xl border border-purple-700/50">
-            <h4 className="text-xs font-semibold text-purple-400 flex items-center gap-2 mb-2">
-              🎬 Video Generation
-            </h4>
-            <p className="text-xs text-dark-400">
-              Video generation uses the same POE API key. Select a video model in Step 3 (Video Mode) to generate videos.
-            </p>
-            <p className="text-xs text-dark-500 mt-2">
-              Available video models: Sora, Veo, Runway, Kling, Hailuo, Pika, Luma
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Progress Steps */}
-      <div className="px-3 py-2.5 lg:px-4 lg:py-3 border-b border-dark-800 flex gap-2 mb-4 overflow-x-auto">
-        {(['read', 'edit', 'config', 'result'] as Step[]).map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-              ${step === s ? 'bg-primary-500 text-white' : 
-                ['read', 'edit', 'config', 'result'].indexOf(step) > i ? 'bg-emerald-500 text-white' : 'bg-dark-700 text-dark-400'}`}>
-              {i + 1}
-            </div>
-            <span className={`text-xs ${step === s ? 'text-white' : 'text-dark-400'}`}>
-              {s === 'read' ? 'Read' : s === 'edit' ? 'Edit' : s === 'config' ? 'Config' : 'Result'}
-            </span>
-            {i < 3 && <div className="w-4 h-px bg-dark-700" />}
-          </div>
-        ))}
-      </div>
-
-      {/* Main Content - Responsive Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+        {/* Main Content - Responsive Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
           {/* Step 1: Read Page - XOOBAY Products */}
           {step === 'read' && (
             <div className="lg:col-span-12">
@@ -1203,11 +1387,10 @@ export const App: React.FC = () => {
                       return (
                         <div
                           key={product.id}
-                          className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-500/20 border-emerald-500'
-                              : 'bg-dark-800/50 border-dark-700 hover:border-dark-600'
-                          }`}
+                          className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected
+                            ? 'bg-emerald-500/20 border-emerald-500'
+                            : 'bg-dark-800/50 border-dark-700 hover:border-dark-600'
+                            }`}
                           onClick={() => {
                             // 只设置选中状态，不加载和跳转
                             setSelectedProductId(product.id);
@@ -1289,757 +1472,774 @@ export const App: React.FC = () => {
             </div>
           )}
 
-        {/* Step 2: Edit Content */}
-        {step === 'edit' && pageContent && (
-          <div className="lg:col-span-12 min-h-[600px] flex flex-col">
-            {/* Tabs */}
-            <div className="flex gap-1 mb-3 bg-dark-800 rounded-lg p-1">
-              <button
-                onClick={() => setEditTab('text')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
+          {/* Step 2: Edit Content */}
+          {step === 'edit' && pageContent && (
+            <div className="lg:col-span-12 min-h-[600px] flex flex-col">
+              {/* Tabs */}
+              <div className="flex gap-1 mb-3 bg-dark-800 rounded-lg p-1">
+                <button
+                  onClick={() => setEditTab('text')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
                   ${editTab === 'text' ? 'bg-primary-500 text-white' : 'text-dark-400 hover:text-white'}`}
-              >
-                📄 Text
-                <span className="text-xs opacity-70">({editedContent.length.toLocaleString()})</span>
-              </button>
-              <button
-                onClick={() => setEditTab('images')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
+                >
+                  📄 Text
+                  <span className="text-xs opacity-70">({editedContent.length.toLocaleString()})</span>
+                </button>
+                <button
+                  onClick={() => setEditTab('images')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
                   ${editTab === 'images' ? 'bg-primary-500 text-white' : 'text-dark-400 hover:text-white'}`}
-              >
-                🖼️ Images
-                <span className="text-xs opacity-70">({selectedImages.length}/{pageContent.images.length})</span>
-              </button>
-            </div>
-
-            {/* Text Tab */}
-            {editTab === 'text' && (
-              <div className="flex-1 flex flex-col">
-                <textarea
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  className="flex-1 w-full p-3 bg-dark-800 border border-dark-700 rounded-xl text-sm text-dark-200 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                  placeholder="Edit the text content..."
-            />
-          </div>
-        )}
-
-            {/* Images Tab */}
-            {editTab === 'images' && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-dark-400">
-                    {selectedImages.length} of {pageContent.images.length} images selected
-                  </span>
-                  <div className="flex gap-2">
-                    <button onClick={handleSelectAllImages} className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg">Select All</button>
-                    <button onClick={handleDeselectAllImages} className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg">Deselect All</button>
+                >
+                  🖼️ Images
+                  <span className="text-xs opacity-70">({selectedImages.length}/{pageContent.images.length})</span>
+                </button>
               </div>
-            </div>
-                
-                <div className="flex-1 overflow-y-auto">
-                  {pageContent.images.length === 0 ? (
-                    <div className="text-center py-8 text-dark-400">No images found on this page</div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {pageContent.images.map((img, index) => {
-                        const isSelected = selectedImages.some(i => i.src === img.src);
-                        return (
-                          <div
-                  key={index}
-                            onClick={() => handleToggleImage(index)}
-                            className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all
+
+              {/* Text Tab */}
+              {editTab === 'text' && (
+                <div className="flex-1 flex flex-col">
+                  <textarea
+                    value={editedContent}
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    className="flex-1 w-full p-3 bg-dark-800 border border-dark-700 rounded-xl text-sm text-dark-200 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    placeholder="Edit the text content..."
+                  />
+                </div>
+              )}
+
+              {/* Images Tab */}
+              {editTab === 'images' && (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs text-dark-400">
+                      {selectedImages.length} of {pageContent.images.length} images selected
+                    </span>
+                    <div className="flex gap-2">
+                      <button onClick={handleSelectAllImages} className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg">Select All</button>
+                      <button onClick={handleDeselectAllImages} className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg">Deselect All</button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto">
+                    {pageContent.images.length === 0 ? (
+                      <div className="text-center py-8 text-dark-400">No images found on this page</div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        {pageContent.images.map((img, index) => {
+                          const isSelected = selectedImages.some(i => i.src === img.src);
+                          return (
+                            <div
+                              key={index}
+                              onClick={() => handleToggleImage(index)}
+                              className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all
                               ${isSelected ? 'border-primary-500 ring-2 ring-primary-500/30' : 'border-dark-700 hover:border-dark-600 opacity-50'}`}
-                          >
-                            <img src={img.src} alt={img.alt} className="w-full h-24 object-cover bg-dark-900"
-                              onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23334155" width="100" height="100"/><text x="50" y="50" text-anchor="middle" fill="%2394a3b8" font-size="12">Error</text></svg>'; }}
-                            />
-                            <div className="absolute top-2 right-2">
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isSelected ? 'bg-primary-500' : 'bg-dark-800/80'}`}>
-                                {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                            >
+                              <img src={img.src} alt={img.alt} className="w-full h-24 object-cover bg-dark-900"
+                                onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23334155" width="100" height="100"/><text x="50" y="50" text-anchor="middle" fill="%2394a3b8" font-size="12">Error</text></svg>'; }}
+                              />
+                              <div className="absolute top-2 right-2">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isSelected ? 'bg-primary-500' : 'bg-dark-800/80'}`}>
+                                  {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                </div>
+                              </div>
+                              <div className="p-2 bg-dark-900/90">
+                                <p className="text-xs text-dark-300 truncate">{img.alt || 'No alt text'}</p>
+                                <p className="text-xs text-dark-500">{img.width}×{img.height}</p>
                               </div>
                             </div>
-                            <div className="p-2 bg-dark-900/90">
-                              <p className="text-xs text-dark-300 truncate">{img.alt || 'No alt text'}</p>
-                              <p className="text-xs text-dark-500">{img.width}×{img.height}</p>
+                          );
+                        })}
                       </div>
-                    </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                    )}
                   </div>
                 </div>
               )}
-              
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setStep('read')} className="flex-1 px-4 py-2.5 bg-dark-800 text-dark-300 rounded-xl border border-dark-700 hover:bg-dark-700">Back</button>
-              <button onClick={handleConfirmContent} disabled={!editedContent.trim()} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-indigo-500 text-white font-medium rounded-xl disabled:opacity-50">Next: Config</button>
-            </div>
+
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setStep('read')} className="flex-1 px-4 py-2.5 bg-dark-800 text-dark-300 rounded-xl border border-dark-700 hover:bg-dark-700">Back</button>
+                <button onClick={handleConfirmContent} disabled={!editedContent.trim()} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-indigo-500 text-white font-medium rounded-xl disabled:opacity-50">Next: Config</button>
+              </div>
             </div>
           )}
 
-        {/* Step 3: AI Config */}
-        {step === 'config' && (
-          <div className="lg:col-span-12 min-h-[600px] flex flex-col">
-            {/* Mode Toggle */}
-            <div className="flex gap-1 mb-4 bg-dark-800 rounded-lg p-1">
-              <button
-                onClick={() => setConfigMode('text')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
+          {/* Step 3: AI Config */}
+          {step === 'config' && (
+            <div className="lg:col-span-12 min-h-[600px] flex flex-col">
+              {/* Mode Toggle */}
+              <div className="flex gap-1 mb-4 bg-dark-800 rounded-lg p-1">
+                <button
+                  onClick={() => setConfigMode('text')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
                   ${configMode === 'text' ? 'bg-primary-500 text-white' : 'text-dark-400 hover:text-white'}`}
-              >
-                📝 Text Generation
-              </button>
-              <button
-                onClick={() => setConfigMode('video')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
+                >
+                  📝 Text Generation
+                </button>
+                <button
+                  onClick={() => setConfigMode('video')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
                   ${configMode === 'video' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-dark-400 hover:text-white'}`}
-              >
-                🎬 Video Prompt
-              </button>
-            </div>
-            
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">
-                {configMode === 'text' ? 'Text AI Configuration' : 'Video Prompt Configuration'}
-              </h3>
-              <button
-                onClick={handleResetConfig}
-                className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
-              >
-                Reset to Default
-              </button>
-            </div>
-            
-            {/* Text Generation Config */}
-            {configMode === 'text' && (
-              <>
-                {/* Quick Options */}
-                <div className="space-y-4 mb-4">
-                  {/* Output Language */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-2">🌐 Output Language</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {OUTPUT_LANGUAGES.slice(0, 6).map(lang => (
-                        <button
-                          key={lang.code}
-                          onClick={() => setAiConfig(c => ({ ...c, outputLanguage: lang.code }))}
-                          className={`px-3 py-2 text-xs rounded-lg transition-all
-                            ${aiConfig.outputLanguage === lang.code 
-                              ? 'bg-primary-500 text-white' 
-                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                        >
-                          {lang.label}
-                        </button>
-                      ))}
-                    </div>
-                    <select
-                      value={aiConfig.outputLanguage}
-                      onChange={(e) => setAiConfig(c => ({ ...c, outputLanguage: e.target.value }))}
-                      className="mt-2 w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-300 text-xs"
-                    >
-                      {OUTPUT_LANGUAGES.map(lang => <option key={lang.code} value={lang.code}>{lang.label}</option>)}
-                    </select>
-                  </div>
+                >
+                  🎬 Video Prompt
+                </button>
+              </div>
 
-                  {/* Output Format */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-2">📄 Output Format</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {OUTPUT_FORMATS.map(fmt => (
-                        <button
-                          key={fmt.code}
-                          onClick={() => setAiConfig(c => ({ ...c, outputFormat: fmt.code }))}
-                          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
-                            ${aiConfig.outputFormat === fmt.code 
-                              ? 'bg-primary-500 text-white' 
-                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                        >
-                          <span>{fmt.icon}</span>
-                          <span className="text-xs">{fmt.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-white">
+                  {configMode === 'text' ? 'Text AI Configuration' : 'Video Prompt Configuration'}
+                </h3>
+                <button
+                  onClick={handleResetConfig}
+                  className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
+                >
+                  Reset to Default
+                </button>
+              </div>
 
-                  {/* Reasoning Effort */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-2">🧠 Reasoning Effort</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {REASONING_LEVELS.map(level => (
-                        <button
-                          key={level.value}
-                          onClick={() => setAiConfig(c => ({ ...c, reasoningEffort: level.value as AIConfig['reasoningEffort'] }))}
-                          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
-                            ${aiConfig.reasoningEffort === level.value 
-                              ? 'bg-primary-500 text-white' 
-                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                        >
-                          <span className="text-sm font-medium">{level.label}</span>
-                          <span className="text-xs opacity-70">{level.description}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Web Search Toggle */}
-                  <div className="flex items-center justify-between p-3 bg-dark-800 rounded-xl">
+              {/* Text Generation Config */}
+              {configMode === 'text' && (
+                <>
+                  {/* Quick Options */}
+                  <div className="space-y-4 mb-4">
+                    {/* Output Language */}
                     <div>
-                      <p className="text-sm text-white">🔍 Enable Web Search</p>
-                      <p className="text-xs text-dark-400">Allow AI to search the web for additional context</p>
-                    </div>
-                    <button
-                      onClick={() => setAiConfig(c => ({ ...c, enableWebSearch: !c.enableWebSearch }))}
-                      className={`w-12 h-6 rounded-full transition-colors relative
-                        ${aiConfig.enableWebSearch ? 'bg-primary-500' : 'bg-dark-700'}`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
-                        ${aiConfig.enableWebSearch ? 'translate-x-7' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* System Prompt Preview */}
-                <div className="flex-1 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs text-dark-400">📝 Generated System Prompt</label>
-                    <button
-                      onClick={() => setShowSystemPrompt(!showSystemPrompt)}
-                      className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
-                    >
-                      {showSystemPrompt ? 'Hide' : 'Preview'}
-                    </button>
-                  </div>
-                  
-                  {/* Config Summary Badge */}
-                  <div className="mb-2 px-3 py-1.5 bg-dark-800/50 rounded-lg border border-dark-700/50 inline-flex items-center gap-2 text-xs text-dark-300">
-                    <span className="text-dark-500">Active:</span>
-                    <span>{getConfigSummary()}</span>
-                  </div>
-                  
-                  {showSystemPrompt && (
-                    <div className="flex-1 overflow-y-auto p-3 bg-dark-800 border border-dark-700 rounded-xl text-xs text-dark-200 font-mono whitespace-pre-wrap">
-                      {finalSystemPrompt}
-                    </div>
-                  )}
-                  
-                  {!showSystemPrompt && (
-                    <div className="p-3 bg-dark-800/50 rounded-xl border border-dark-700/50">
-                      <p className="text-xs text-dark-400">
-                        System prompt generated ({finalSystemPrompt.length.toLocaleString()} characters)
-                      </p>
-                      <p className="text-xs text-dark-500 mt-1">
-                        Click "Preview" to view the full prompt with your settings integrated.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-            
-            {/* Video Prompt Config */}
-            {configMode === 'video' && (
-              <div className="flex-1 overflow-y-auto space-y-4">
-                {/* Video Model Selection */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">🎥 Video Model</label>
-                  <select
-                    value={videoConfig.model}
-                    onChange={(e) => handleVideoModelChange(e.target.value as VideoModel)}
-                    className="w-full px-3 py-2.5 bg-dark-800 border border-purple-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                  >
-                    {VIDEO_MODELS.map(model => (
-                      <option key={model.name} value={model.name}>
-                        {model.displayName} ({model.provider}) - {model.minDuration}-{model.maxDuration}s
-                        {model.supportsSoundGeneration ? ' 🔊' : ''}
-                        {model.supportsImageReference ? ' 🖼️' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {/* Model Info Card */}
-                  <div className="mt-2 p-3 bg-dark-800/50 rounded-lg border border-dark-700/50">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-white">{currentVideoModel.displayName}</span>
-                      <span className="text-xs text-purple-400">{currentVideoModel.provider}</span>
-                    </div>
-                    <p className="text-xs text-dark-400 mt-1">{currentVideoModel.description}</p>
-                    <div className="flex gap-2 mt-2">
-                      <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">{currentVideoModel.minDuration}-{currentVideoModel.maxDuration}s</span>
-                      <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">{currentVideoModel.defaultWidth}×{currentVideoModel.defaultHeight}</span>
-                      {currentVideoModel.supportsImageReference && <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">🖼️ Image</span>}
-                      {currentVideoModel.supportsSoundGeneration && <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">🔊 Audio</span>}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Duration Slider */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">⏱️ Duration: {videoConfig.duration}s</label>
-                  <input
-                    type="range"
-                    min={currentVideoModel.minDuration}
-                    max={currentVideoModel.maxDuration}
-                    step={currentVideoModel.durationStep}
-                    value={videoConfig.duration}
-                    onChange={(e) => setVideoConfig(c => ({ ...c, duration: Number(e.target.value) }))}
-                    className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                  />
-                  <div className="flex justify-between text-xs text-dark-500 mt-1">
-                    <span>{currentVideoModel.minDuration}s</span>
-                    <span>{currentVideoModel.maxDuration}s</span>
-                  </div>
-                </div>
-                
-                {/* Video Dimensions */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">📐 Video Size ({videoConfig.width}×{videoConfig.height})</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { w: 1280, h: 720, label: '720p 16:9' },
-                      { w: 720, h: 1280, label: '720p 9:16' },
-                      { w: 1920, h: 1080, label: '1080p 16:9' },
-                      { w: 1080, h: 1920, label: '1080p 9:16' },
-                      { w: 1080, h: 1080, label: '1080p 1:1' },
-                      { w: 720, h: 720, label: '720p 1:1' },
-                    ].map(size => {
-                      const isSelected = videoConfig.width === size.w && videoConfig.height === size.h;
-                      return (
-                        <button
-                          key={`${size.w}x${size.h}`}
-                          onClick={() => setVideoConfig(c => ({ ...c, width: size.w, height: size.h }))}
-                          className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-all text-xs
-                            ${isSelected 
-                              ? 'bg-purple-500 text-white' 
-                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                        >
-                          <div className={`border-2 ${isSelected ? 'border-white' : 'border-dark-500'} rounded
-                            ${size.w > size.h ? 'w-5 h-3' : size.w < size.h ? 'w-3 h-5' : 'w-4 h-4'}`} />
-                          <span>{size.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                
-                {/* Video Style */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">🎨 Video Style</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {VIDEO_STYLES.map(style => (
-                      <button
-                        key={style.code}
-                        onClick={() => setVideoConfig(c => ({ ...c, videoStyle: style.code as VideoConfig['videoStyle'] }))}
-                        className={`flex flex-col items-start p-3 rounded-xl transition-all text-left
-                          ${videoConfig.videoStyle === style.code 
-                            ? 'bg-purple-500/20 border-2 border-purple-500' 
-                            : 'bg-dark-800 border-2 border-dark-700 hover:border-dark-600'}`}
+                      <label className="block text-xs text-dark-400 mb-2">🌐 Output Language</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {OUTPUT_LANGUAGES.slice(0, 6).map(lang => (
+                          <button
+                            key={lang.code}
+                            onClick={() => setAiConfig(c => ({ ...c, outputLanguage: lang.code }))}
+                            className={`px-3 py-2 text-xs rounded-lg transition-all
+                            ${aiConfig.outputLanguage === lang.code
+                                ? 'bg-primary-500 text-white'
+                                : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
+                          >
+                            {lang.label}
+                          </button>
+                        ))}
+                      </div>
+                      <select
+                        value={aiConfig.outputLanguage}
+                        onChange={(e) => setAiConfig(c => ({ ...c, outputLanguage: e.target.value }))}
+                        className="mt-2 w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-300 text-xs"
                       >
-                        <span className="text-base">{style.icon} {style.label}</span>
-                        <span className="text-xs text-dark-400 mt-1">{style.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Target Language */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">🌐 On-screen Text Language</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {VIDEO_OUTPUT_LANGUAGES.map(lang => (
-                      <button
-                        key={lang.code}
-                        onClick={() => setVideoConfig(c => ({ ...c, targetLanguage: lang.code as VideoConfig['targetLanguage'] }))}
-                        className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
-                          ${videoConfig.targetLanguage === lang.code 
-                            ? 'bg-purple-500 text-white' 
-                            : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                      >
-                        <span>{lang.flag}</span>
-                        <span className="text-xs">{lang.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Brand Settings */}
-                <div className="p-3 bg-dark-800 rounded-xl space-y-3">
-                  <label className="block text-xs text-dark-400">🏷️ Brand Settings</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-dark-500 mb-1">Brand Name</label>
-                      <input
-                        type="text"
-                        value={videoConfig.brandName}
-                        onChange={(e) => setVideoConfig(c => ({ ...c, brandName: e.target.value }))}
-                        className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                        placeholder="XOOBAY"
-                      />
+                        {OUTPUT_LANGUAGES.map(lang => <option key={lang.code} value={lang.code}>{lang.label}</option>)}
+                      </select>
                     </div>
+
+                    {/* Output Format */}
                     <div>
-                      <label className="block text-xs text-dark-500 mb-1">Brand URL</label>
-                      <input
-                        type="text"
-                        value={videoConfig.brandUrl}
-                        onChange={(e) => setVideoConfig(c => ({ ...c, brandUrl: e.target.value }))}
-                        className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                        placeholder="https://www.xoobay.com/"
-                      />
+                      <label className="block text-xs text-dark-400 mb-2">📄 Output Format</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {OUTPUT_FORMATS.map(fmt => (
+                          <button
+                            key={fmt.code}
+                            onClick={() => setAiConfig(c => ({ ...c, outputFormat: fmt.code }))}
+                            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
+                            ${aiConfig.outputFormat === fmt.code
+                                ? 'bg-primary-500 text-white'
+                                : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
+                          >
+                            <span>{fmt.icon}</span>
+                            <span className="text-xs">{fmt.label}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
-                
-                {/* Sound Toggle */}
-                {currentVideoModel.supportsSoundGeneration && (
-                  <div className="flex items-center justify-between p-3 bg-dark-800 rounded-xl">
+
+                    {/* Reasoning Effort */}
                     <div>
-                      <p className="text-sm text-white">🔊 Generate Audio</p>
-                      <p className="text-xs text-dark-400">Include ambient sounds and effects</p>
+                      <label className="block text-xs text-dark-400 mb-2">🧠 Reasoning Effort</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {REASONING_LEVELS.map(level => (
+                          <button
+                            key={level.value}
+                            onClick={() => setAiConfig(c => ({ ...c, reasoningEffort: level.value as AIConfig['reasoningEffort'] }))}
+                            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
+                            ${aiConfig.reasoningEffort === level.value
+                                ? 'bg-primary-500 text-white'
+                                : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
+                          >
+                            <span className="text-sm font-medium">{level.label}</span>
+                            <span className="text-xs opacity-70">{level.description}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setVideoConfig(c => ({ ...c, enableSound: !c.enableSound }))}
-                      className={`w-12 h-6 rounded-full transition-colors relative
-                        ${videoConfig.enableSound ? 'bg-purple-500' : 'bg-dark-700'}`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
-                        ${videoConfig.enableSound ? 'translate-x-7' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                )}
-                
-                {/* Image Reference Toggle */}
-                {currentVideoModel.supportsImageReference && (
-                  <div className="p-3 bg-dark-800 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
+
+                    {/* Web Search Toggle */}
+                    <div className="flex items-center justify-between p-3 bg-dark-800 rounded-xl">
                       <div>
-                        <p className="text-sm text-white">🖼️ Use Image Reference</p>
-                        <p className="text-xs text-dark-400">Provide a product image as reference</p>
+                        <p className="text-sm text-white">🔍 Enable Web Search</p>
+                        <p className="text-xs text-dark-400">Allow AI to search the web for additional context</p>
                       </div>
                       <button
-                        onClick={() => setVideoConfig(c => ({ ...c, useImageReference: !c.useImageReference }))}
+                        onClick={() => setAiConfig(c => ({ ...c, enableWebSearch: !c.enableWebSearch }))}
                         className={`w-12 h-6 rounded-full transition-colors relative
-                          ${videoConfig.useImageReference ? 'bg-purple-500' : 'bg-dark-700'}`}
+                        ${aiConfig.enableWebSearch ? 'bg-primary-500' : 'bg-dark-700'}`}
                       >
                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
-                          ${videoConfig.useImageReference ? 'translate-x-7' : 'translate-x-1'}`} />
+                        ${aiConfig.enableWebSearch ? 'translate-x-7' : 'translate-x-1'}`} />
                       </button>
                     </div>
-                    {videoConfig.useImageReference && (
-                      <>
-                        <input
-                          type="text"
-                          value={videoConfig.referenceImageUrl}
-                          onChange={(e) => setVideoConfig(c => ({ ...c, referenceImageUrl: e.target.value }))}
-                          className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                          placeholder="https://example.com/product-image.jpg"
-                        />
-                        {selectedImages.length > 0 && (
-                          <div>
-                            <p className="text-xs text-dark-400 mb-2">Or select from page images:</p>
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                              {selectedImages.slice(0, 5).map((img, i) => (
-                                <button
-                                  key={i}
-                                  onClick={() => setVideoConfig(c => ({ ...c, referenceImageUrl: img.src }))}
-                                  className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all
-                                    ${videoConfig.referenceImageUrl === img.src ? 'border-purple-500' : 'border-dark-600 hover:border-dark-500'}`}
-                                >
-                                  <img src={img.src} alt={img.alt} className="w-full h-full object-cover" />
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
+                  </div>
+
+                  {/* System Prompt Preview */}
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs text-dark-400">📝 Generated System Prompt</label>
+                      <button
+                        onClick={() => setShowSystemPrompt(!showSystemPrompt)}
+                        className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
+                      >
+                        {showSystemPrompt ? 'Hide' : 'Preview'}
+                      </button>
+                    </div>
+
+                    {/* Config Summary Badge */}
+                    <div className="mb-2 px-3 py-1.5 bg-dark-800/50 rounded-lg border border-dark-700/50 inline-flex items-center gap-2 text-xs text-dark-300">
+                      <span className="text-dark-500">Active:</span>
+                      <span>{getConfigSummary()}</span>
+                    </div>
+
+                    {showSystemPrompt && (
+                      <div className="flex-1 overflow-y-auto p-3 bg-dark-800 border border-dark-700 rounded-xl text-xs text-dark-200 font-mono whitespace-pre-wrap">
+                        {finalSystemPrompt}
+                      </div>
+                    )}
+
+                    {!showSystemPrompt && (
+                      <div className="p-3 bg-dark-800/50 rounded-xl border border-dark-700/50">
+                        <p className="text-xs text-dark-400">
+                          System prompt generated ({finalSystemPrompt.length.toLocaleString()} characters)
+                        </p>
+                        <p className="text-xs text-dark-500 mt-1">
+                          Click "Preview" to view the full prompt with your settings integrated.
+                        </p>
+                      </div>
                     )}
                   </div>
+                </>
+              )}
+
+              {/* Video Prompt Config */}
+              {configMode === 'video' && (
+                <div className="flex-1 overflow-y-auto space-y-4">
+                  {/* Video Model Selection */}
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-2">🎥 Video Model</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={VIDEO_MODELS.some(m => m.name === videoConfig.model) ? videoConfig.model : 'custom'}
+                        onChange={(e) => {
+                          if (e.target.value !== 'custom') {
+                            handleVideoModelChange(e.target.value as VideoModel);
+                          } else {
+                            // If 'custom' is selected, clear the model name to prompt user input
+                            setVideoConfig(c => ({ ...c, model: '' as VideoModel }));
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 bg-dark-800 border border-purple-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      >
+                        {VIDEO_MODELS.map(model => (
+                          <option key={model.name} value={model.name}>
+                            {model.displayName}
+                          </option>
+                        ))}
+                        <option value="custom">-- Custom Model --</option>
+                      </select>
+                      {(!VIDEO_MODELS.some(m => m.name === videoConfig.model) || videoConfig.model === ('custom' as any)) && (
+                        <input
+                          type="text"
+                          value={VIDEO_MODELS.some(m => m.name === videoConfig.model) ? '' : videoConfig.model}
+                          onChange={(e) => setVideoConfig(c => ({ ...c, model: e.target.value as any }))}
+                          placeholder="Model ID"
+                          className="flex-1 px-3 py-2 bg-dark-800 border border-purple-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                        />
+                      )}
+                    </div>
+                    {/* Model Info Card */}
+                    <div className="mt-2 p-3 bg-dark-800/50 rounded-lg border border-dark-700/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white">{currentVideoModel.displayName}</span>
+                        <span className="text-xs text-purple-400">{currentVideoModel.provider}</span>
+                      </div>
+                      <p className="text-xs text-dark-400 mt-1">{currentVideoModel.description}</p>
+                      <div className="flex gap-2 mt-2">
+                        <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">{currentVideoModel.minDuration}-{currentVideoModel.maxDuration}s</span>
+                        <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">{currentVideoModel.defaultWidth}×{currentVideoModel.defaultHeight}</span>
+                        {currentVideoModel.supportsImageReference && <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">🖼️ Image</span>}
+                        {currentVideoModel.supportsSoundGeneration && <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">🔊 Audio</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Duration Slider */}
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-2">⏱️ Duration: {videoConfig.duration}s</label>
+                    <input
+                      type="range"
+                      min={currentVideoModel.minDuration}
+                      max={currentVideoModel.maxDuration}
+                      step={currentVideoModel.durationStep}
+                      value={videoConfig.duration}
+                      onChange={(e) => setVideoConfig(c => ({ ...c, duration: Number(e.target.value) }))}
+                      className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    />
+                    <div className="flex justify-between text-xs text-dark-500 mt-1">
+                      <span>{currentVideoModel.minDuration}s</span>
+                      <span>{currentVideoModel.maxDuration}s</span>
+                    </div>
+                  </div>
+
+                  {/* Video Dimensions */}
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-2">📐 Video Size ({videoConfig.width}×{videoConfig.height})</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { w: 1280, h: 720, label: '720p 16:9' },
+                        { w: 720, h: 1280, label: '720p 9:16' },
+                        { w: 1920, h: 1080, label: '1080p 16:9' },
+                        { w: 1080, h: 1920, label: '1080p 9:16' },
+                        { w: 1080, h: 1080, label: '1080p 1:1' },
+                        { w: 720, h: 720, label: '720p 1:1' },
+                      ].map(size => {
+                        const isSelected = videoConfig.width === size.w && videoConfig.height === size.h;
+                        return (
+                          <button
+                            key={`${size.w}x${size.h}`}
+                            onClick={() => setVideoConfig(c => ({ ...c, width: size.w, height: size.h }))}
+                            className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-all text-xs
+                            ${isSelected
+                                ? 'bg-purple-500 text-white'
+                                : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
+                          >
+                            <div className={`border-2 ${isSelected ? 'border-white' : 'border-dark-500'} rounded
+                            ${size.w > size.h ? 'w-5 h-3' : size.w < size.h ? 'w-3 h-5' : 'w-4 h-4'}`} />
+                            <span>{size.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Video Style */}
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-2">🎨 Video Style</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {VIDEO_STYLES.map(style => (
+                        <button
+                          key={style.code}
+                          onClick={() => setVideoConfig(c => ({ ...c, videoStyle: style.code as VideoConfig['videoStyle'] }))}
+                          className={`flex flex-col items-start p-3 rounded-xl transition-all text-left
+                          ${videoConfig.videoStyle === style.code
+                              ? 'bg-purple-500/20 border-2 border-purple-500'
+                              : 'bg-dark-800 border-2 border-dark-700 hover:border-dark-600'}`}
+                        >
+                          <span className="text-base">{style.icon} {style.label}</span>
+                          <span className="text-xs text-dark-400 mt-1">{style.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Target Language */}
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-2">🌐 On-screen Text Language</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {VIDEO_OUTPUT_LANGUAGES.map(lang => (
+                        <button
+                          key={lang.code}
+                          onClick={() => setVideoConfig(c => ({ ...c, targetLanguage: lang.code as VideoConfig['targetLanguage'] }))}
+                          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
+                          ${videoConfig.targetLanguage === lang.code
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
+                        >
+                          <span>{lang.flag}</span>
+                          <span className="text-xs">{lang.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Brand Settings */}
+                  <div className="p-3 bg-dark-800 rounded-xl space-y-3">
+                    <label className="block text-xs text-dark-400">🏷️ Brand Settings</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs text-dark-500 mb-1">Brand Name</label>
+                        <input
+                          type="text"
+                          value={videoConfig.brandName}
+                          onChange={(e) => setVideoConfig(c => ({ ...c, brandName: e.target.value }))}
+                          className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                          placeholder="XOOBAY"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-dark-500 mb-1">Brand URL</label>
+                        <input
+                          type="text"
+                          value={videoConfig.brandUrl}
+                          onChange={(e) => setVideoConfig(c => ({ ...c, brandUrl: e.target.value }))}
+                          className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                          placeholder="https://www.xoobay.com/"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sound Toggle */}
+                  {currentVideoModel.supportsSoundGeneration && (
+                    <div className="flex items-center justify-between p-3 bg-dark-800 rounded-xl">
+                      <div>
+                        <p className="text-sm text-white">🔊 Generate Audio</p>
+                        <p className="text-xs text-dark-400">Include ambient sounds and effects</p>
+                      </div>
+                      <button
+                        onClick={() => setVideoConfig(c => ({ ...c, enableSound: !c.enableSound }))}
+                        className={`w-12 h-6 rounded-full transition-colors relative
+                        ${videoConfig.enableSound ? 'bg-purple-500' : 'bg-dark-700'}`}
+                      >
+                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
+                        ${videoConfig.enableSound ? 'translate-x-7' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Image Reference Toggle */}
+                  {currentVideoModel.supportsImageReference && (
+                    <div className="p-3 bg-dark-800 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-white">🖼️ Use Image Reference</p>
+                          <p className="text-xs text-dark-400">Provide a product image as reference</p>
+                        </div>
+                        <button
+                          onClick={() => setVideoConfig(c => ({ ...c, useImageReference: !c.useImageReference }))}
+                          className={`w-12 h-6 rounded-full transition-colors relative
+                          ${videoConfig.useImageReference ? 'bg-purple-500' : 'bg-dark-700'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
+                          ${videoConfig.useImageReference ? 'translate-x-7' : 'translate-x-1'}`} />
+                        </button>
+                      </div>
+                      {videoConfig.useImageReference && (
+                        <>
+                          <input
+                            type="text"
+                            value={videoConfig.referenceImageUrl}
+                            onChange={(e) => setVideoConfig(c => ({ ...c, referenceImageUrl: e.target.value }))}
+                            className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                            placeholder="https://example.com/product-image.jpg"
+                          />
+                          {selectedImages.length > 0 && (
+                            <div>
+                              <p className="text-xs text-dark-400 mb-2">Or select from page images:</p>
+                              <div className="flex gap-2 overflow-x-auto pb-2">
+                                {selectedImages.slice(0, 5).map((img, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => setVideoConfig(c => ({ ...c, referenceImageUrl: img.src }))}
+                                    className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all
+                                    ${videoConfig.referenceImageUrl === img.src ? 'border-purple-500' : 'border-dark-600 hover:border-dark-500'}`}
+                                  >
+                                    <img src={img.src} alt={img.alt} className="w-full h-full object-cover" />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Video System Prompt Preview */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs text-dark-400">📝 Video System Prompt</label>
+                      <button
+                        onClick={() => setShowSystemPrompt(!showSystemPrompt)}
+                        className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
+                      >
+                        {showSystemPrompt ? 'Hide' : 'Preview'}
+                      </button>
+                    </div>
+
+                    {/* Video Config Summary */}
+                    <div className="mb-2 px-3 py-1.5 bg-purple-500/10 rounded-lg border border-purple-500/30 text-xs text-purple-300">
+                      🎬 {currentVideoModel.displayName} • {videoConfig.duration}s • {videoConfig.width}×{videoConfig.height} • {videoConfig.videoStyle}
+                    </div>
+
+                    {showSystemPrompt && (
+                      <div className="max-h-48 overflow-y-auto p-3 bg-dark-800 border border-dark-700 rounded-xl text-xs text-dark-200 font-mono whitespace-pre-wrap">
+                        {finalVideoSystemPrompt}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="my-4 p-3 bg-dark-800/50 rounded-xl border border-dark-700/50">
+                <p className="text-xs text-dark-400 mb-1">Ready to process:</p>
+                <p className="text-sm text-dark-200">
+                  {configMode === 'text' ? '📝' : '🎬'} {editedContent.length.toLocaleString()} chars • 🖼️ {selectedImages.length} images
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={() => setStep('edit')} className="flex-1 px-4 py-2.5 bg-dark-800 text-dark-300 rounded-xl border border-dark-700 hover:bg-dark-700">Back</button>
+                <button
+                  onClick={handleSendToAI}
+                  disabled={aiLoading || (configMode === 'text' ? !aiConfig.systemPrompt.trim() : !finalVideoSystemPrompt.trim())}
+                  className={`flex-1 px-4 py-2.5 text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2
+                  ${configMode === 'video' ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-primary-500 to-indigo-500'}`}
+                >
+                  {aiLoading ? (
+                    <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Processing...</>
+                  ) : configMode === 'video' ? (
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Generate Video Prompt</>
+                  ) : (
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Generate</>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Result */}
+          {step === 'result' && (
+            <div className="lg:col-span-12 min-h-[600px] flex flex-col">
+              {/* Result Type Indicator */}
+              <div className="flex items-center gap-2 mb-3">
+                {configMode === 'video' ? (
+                  <span className="px-3 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/50 text-purple-300 text-xs font-medium rounded-full flex items-center gap-1">
+                    🎬 Video Generation Result
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-primary-500/20 border border-primary-500/50 text-primary-300 text-xs font-medium rounded-full flex items-center gap-1">
+                    📝 Text Generation Result
+                  </span>
                 )}
-                
-                {/* Video System Prompt Preview */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs text-dark-400">📝 Video System Prompt</label>
+              </div>
+
+              {/* Controls - Responsive layout */}
+              <div className="flex flex-col gap-2 mb-3">
+                {/* View toggle and action buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* View Mode Toggle */}
+                  <div className="flex gap-1 bg-dark-800 rounded-lg p-1">
                     <button
-                      onClick={() => setShowSystemPrompt(!showSystemPrompt)}
-                      className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
-                    >
-                      {showSystemPrompt ? 'Hide' : 'Preview'}
-                    </button>
+                      onClick={() => setResultView('rendered')}
+                      className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${resultView === 'rendered' ? (configMode === 'video' ? 'bg-purple-500' : 'bg-primary-500') + ' text-white' : 'text-dark-400 hover:text-white'}`}
+                    >{configMode === 'video' ? '🎬 Video' : '📊 Preview'}</button>
+                    <button
+                      onClick={() => setResultView('raw')}
+                      className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${resultView === 'raw' ? (configMode === 'video' ? 'bg-purple-500' : 'bg-primary-500') + ' text-white' : 'text-dark-400 hover:text-white'}`}
+                    >📄 {configMode === 'video' ? 'Prompt' : 'Source'}</button>
                   </div>
-                  
-                  {/* Video Config Summary */}
-                  <div className="mb-2 px-3 py-1.5 bg-purple-500/10 rounded-lg border border-purple-500/30 text-xs text-purple-300">
-                    🎬 {currentVideoModel.displayName} • {videoConfig.duration}s • {videoConfig.width}×{videoConfig.height} • {videoConfig.videoStyle}
-                  </div>
-                  
-                  {showSystemPrompt && (
-                    <div className="max-h-48 overflow-y-auto p-3 bg-dark-800 border border-dark-700 rounded-xl text-xs text-dark-200 font-mono whitespace-pre-wrap">
-                      {finalVideoSystemPrompt}
+
+                  {/* Action Buttons */}
+                  {(aiResult || videoResult) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => handleCopy(videoResult?.prompt || videoResult?.content || aiResult || '')}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg whitespace-nowrap"
+                        title="Copy to clipboard"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        <span className="hidden sm:inline">Copy</span>
+                      </button>
+                      {configMode !== 'video' && aiResult && (
+                        <>
+                          <button
+                            onClick={handleDownload}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg whitespace-nowrap"
+                            title="Download file"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            <span className="hidden sm:inline">Download</span>
+                          </button>
+                          <button
+                            onClick={handleSaveTextToLibrary}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg whitespace-nowrap"
+                            title="Save to library"
+                          >
+                            📚 <span className="hidden sm:inline">Save</span>
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
-            )}
 
-            {/* Summary */}
-            <div className="my-4 p-3 bg-dark-800/50 rounded-xl border border-dark-700/50">
-              <p className="text-xs text-dark-400 mb-1">Ready to process:</p>
-              <p className="text-sm text-dark-200">
-                {configMode === 'text' ? '📝' : '🎬'} {editedContent.length.toLocaleString()} chars • 🖼️ {selectedImages.length} images
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button onClick={() => setStep('edit')} className="flex-1 px-4 py-2.5 bg-dark-800 text-dark-300 rounded-xl border border-dark-700 hover:bg-dark-700">Back</button>
-              <button
-                onClick={handleSendToAI}
-                disabled={aiLoading || (configMode === 'text' ? !aiConfig.systemPrompt.trim() : !finalVideoSystemPrompt.trim())}
-                className={`flex-1 px-4 py-2.5 text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2
-                  ${configMode === 'video' ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-primary-500 to-indigo-500'}`}
-              >
-                {aiLoading ? (
-                  <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Processing...</>
-                ) : configMode === 'video' ? (
-                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Generate Video Prompt</>
-                ) : (
-                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Generate</>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Result */}
-        {step === 'result' && (
-          <div className="lg:col-span-12 min-h-[600px] flex flex-col">
-            {/* Result Type Indicator */}
-            <div className="flex items-center gap-2 mb-3">
-              {configMode === 'video' ? (
-                <span className="px-3 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/50 text-purple-300 text-xs font-medium rounded-full flex items-center gap-1">
-                  🎬 Video Generation Result
-                </span>
-              ) : (
-                <span className="px-3 py-1 bg-primary-500/20 border border-primary-500/50 text-primary-300 text-xs font-medium rounded-full flex items-center gap-1">
-                  📝 Text Generation Result
-                </span>
-              )}
-            </div>
-            
-            {/* Controls - Responsive layout */}
-            <div className="flex flex-col gap-2 mb-3">
-              {/* View toggle and action buttons */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* View Mode Toggle */}
-                <div className="flex gap-1 bg-dark-800 rounded-lg p-1">
-                  <button
-                    onClick={() => setResultView('rendered')}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${resultView === 'rendered' ? (configMode === 'video' ? 'bg-purple-500' : 'bg-primary-500') + ' text-white' : 'text-dark-400 hover:text-white'}`}
-                  >{configMode === 'video' ? '🎬 Video' : '📊 Preview'}</button>
-                  <button
-                    onClick={() => setResultView('raw')}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${resultView === 'raw' ? (configMode === 'video' ? 'bg-purple-500' : 'bg-primary-500') + ' text-white' : 'text-dark-400 hover:text-white'}`}
-                  >📄 {configMode === 'video' ? 'Prompt' : 'Source'}</button>
+              {aiError && (
+                <div className="p-3 bg-red-900/30 border border-red-700/50 rounded-xl mb-3">
+                  <p className="text-red-400 text-sm">{aiError}</p>
                 </div>
-                
-                {/* Action Buttons */}
-                {(aiResult || videoResult) && (
-                  <div className="flex flex-wrap gap-1.5">
-                    <button 
-                      onClick={() => handleCopy(videoResult?.prompt || videoResult?.content || aiResult || '')} 
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg whitespace-nowrap"
-                      title="Copy to clipboard"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                      <span className="hidden sm:inline">Copy</span>
-                    </button>
-                    {configMode !== 'video' && aiResult && (
-                      <>
-                        <button 
-                          onClick={handleDownload} 
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg whitespace-nowrap"
-                          title="Download file"
+              )}
+
+              {/* Video Result */}
+              {configMode === 'video' && videoResult && (
+                <div className="flex-1 overflow-y-auto space-y-4">
+                  {/* Video Generating Status */}
+                  {(videoResult.type === 'pending' || videoPolling) && resultView === 'rendered' && (
+                    <div className="p-6 bg-gradient-to-br from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-xl">
+                      <div className="flex flex-col items-center text-center">
+                        <div className="relative w-20 h-20 mb-4">
+                          <svg className="w-20 h-20 animate-spin" viewBox="0 0 100 100">
+                            <circle
+                              cx="50" cy="50" r="40"
+                              stroke="currentColor"
+                              strokeWidth="8"
+                              fill="none"
+                              className="text-dark-700"
+                            />
+                            <circle
+                              cx="50" cy="50" r="40"
+                              stroke="currentColor"
+                              strokeWidth="8"
+                              fill="none"
+                              strokeDasharray={`${(videoResult.progress || 0) * 2.51} 251`}
+                              strokeLinecap="round"
+                              className="text-purple-500"
+                              style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-lg font-bold text-purple-300">{videoResult.progress || 0}%</span>
+                          </div>
+                        </div>
+                        <h3 className="text-lg font-semibold text-white mb-2">Generating Video...</h3>
+                        <p className="text-sm text-dark-400 mb-4">
+                          {videoResult.status === 'pending' ? 'Waiting in queue...' : 'Processing your video...'}
+                        </p>
+                        <div className="text-xs text-dark-500 space-y-1">
+                          <p>Model: {currentVideoModel.displayName}</p>
+                          <p>Duration: {videoConfig.duration}s • Size: {videoConfig.width}×{videoConfig.height}</p>
+                        </div>
+                        <button
+                          onClick={() => { stopPolling(); clearResult(); setStep('config'); }}
+                          className="mt-4 px-4 py-2 text-xs bg-dark-700 hover:bg-dark-600 text-dark-300 rounded-lg"
                         >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                          <span className="hidden sm:inline">Download</span>
+                          Cancel
                         </button>
-                        <button 
-                          onClick={handleSaveTextToLibrary} 
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg whitespace-nowrap"
-                          title="Save to library"
-                        >
-                          📚 <span className="hidden sm:inline">Save</span>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {aiError && (
-              <div className="p-3 bg-red-900/30 border border-red-700/50 rounded-xl mb-3">
-                <p className="text-red-400 text-sm">{aiError}</p>
-              </div>
-            )}
-            
-            {/* Video Result */}
-            {configMode === 'video' && videoResult && (
-              <div className="flex-1 overflow-y-auto space-y-4">
-                {/* Video Generating Status */}
-                {(videoResult.type === 'pending' || videoPolling) && resultView === 'rendered' && (
-                  <div className="p-6 bg-gradient-to-br from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-xl">
-                    <div className="flex flex-col items-center text-center">
-                      <div className="relative w-20 h-20 mb-4">
-                        <svg className="w-20 h-20 animate-spin" viewBox="0 0 100 100">
-                          <circle 
-                            cx="50" cy="50" r="40" 
-                            stroke="currentColor" 
-                            strokeWidth="8" 
-                            fill="none" 
-                            className="text-dark-700"
-                          />
-                          <circle 
-                            cx="50" cy="50" r="40" 
-                            stroke="currentColor" 
-                            strokeWidth="8" 
-                            fill="none" 
-                            strokeDasharray={`${(videoResult.progress || 0) * 2.51} 251`}
-                            strokeLinecap="round"
-                            className="text-purple-500"
-                            style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-lg font-bold text-purple-300">{videoResult.progress || 0}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Video Player */}
+                  {videoResult.type === 'video' && videoResult.videoUrl && resultView === 'rendered' && (
+                    <div className="bg-black rounded-xl overflow-hidden">
+                      <video
+                        src={videoResult.videoUrl}
+                        controls
+                        autoPlay
+                        className="w-full aspect-video"
+                        poster={videoResult.thumbnailUrl}
+                      >
+                        Your browser does not support video playback.
+                      </video>
+                      <div className="p-3 bg-dark-800 border-t border-dark-700">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-dark-400">✅ Video Generated Successfully</span>
+                          <a
+                            href={videoResult.videoUrl}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Download Video
+                          </a>
                         </div>
                       </div>
-                      <h3 className="text-lg font-semibold text-white mb-2">Generating Video...</h3>
-                      <p className="text-sm text-dark-400 mb-4">
-                        {videoResult.status === 'pending' ? 'Waiting in queue...' : 'Processing your video...'}
-                      </p>
-                      <div className="text-xs text-dark-500 space-y-1">
-                        <p>Model: {currentVideoModel.displayName}</p>
-                        <p>Duration: {videoConfig.duration}s • Size: {videoConfig.width}×{videoConfig.height}</p>
-                      </div>
-                      <button
-                        onClick={() => { stopPolling(); clearResult(); setStep('config'); }}
-                        className="mt-4 px-4 py-2 text-xs bg-dark-700 hover:bg-dark-600 text-dark-300 rounded-lg"
-                      >
-                        Cancel
-                      </button>
                     </div>
-                  </div>
-                )}
-                
-                {/* Video Player */}
-                {videoResult.type === 'video' && videoResult.videoUrl && resultView === 'rendered' && (
-                  <div className="bg-black rounded-xl overflow-hidden">
-                    <video 
-                      src={videoResult.videoUrl} 
-                      controls 
-                      autoPlay
-                      className="w-full aspect-video"
-                      poster={videoResult.thumbnailUrl}
-                    >
-                      Your browser does not support video playback.
-                    </video>
-                    <div className="p-3 bg-dark-800 border-t border-dark-700">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-dark-400">✅ Video Generated Successfully</span>
-                        <a 
-                          href={videoResult.videoUrl} 
-                          download 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Download Video
-                        </a>
+                  )}
+
+                  {/* No Video - Show Prompt */}
+                  {videoResult.type === 'text' && resultView === 'rendered' && (
+                    <div className="p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xs font-medium text-purple-300">
+                          📝 Generated Video Prompt
+                        </span>
+                        {videoResult.status === 'failed' && (
+                          <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded">Failed</span>
+                        )}
+                      </div>
+                      <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono bg-dark-900 p-3 rounded-lg max-h-64 overflow-y-auto">
+                        {videoResult.prompt || videoResult.content}
+                      </pre>
+                      <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
+                        <p className="text-amber-400 text-xs">
+                          💡 {!settings.apiKey
+                            ? 'API Key not configured. Add your POE API key in Settings to generate videos.'
+                            : 'Copy this prompt and use it with video generation tools, or check if the selected model supports video generation.'}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                )}
-                
-                {/* No Video - Show Prompt */}
-                {videoResult.type === 'text' && resultView === 'rendered' && (
-                  <div className="p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-medium text-purple-300">
-                        📝 Generated Video Prompt
-                      </span>
-                      {videoResult.status === 'failed' && (
-                        <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded">Failed</span>
-                      )}
+                  )}
+
+                  {/* Raw Prompt View */}
+                  {resultView === 'raw' && videoResult.prompt && (
+                    <div className="p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xs font-medium text-purple-300">📝 Video Prompt</span>
+                      </div>
+                      <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono bg-dark-900 p-3 rounded-lg">
+                        {videoResult.prompt}
+                      </pre>
                     </div>
-                    <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono bg-dark-900 p-3 rounded-lg max-h-64 overflow-y-auto">
-                      {videoResult.prompt || videoResult.content}
-                    </pre>
-                    <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
-                      <p className="text-amber-400 text-xs">
-                        💡 {!settings.apiKey 
-                          ? 'API Key not configured. Add your POE API key in Settings to generate videos.'
-                          : 'Copy this prompt and use it with video generation tools, or check if the selected model supports video generation.'}
-                      </p>
+                  )}
+
+                  {/* Video Info */}
+                  {videoResult.type === 'video' && resultView === 'rendered' && (
+                    <div className="p-3 bg-dark-800/50 border border-dark-700/50 rounded-xl">
+                      <h4 className="text-xs font-medium text-dark-400 mb-2">Video Details</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-dark-500">Model:</span> <span className="text-dark-200">{currentVideoModel.displayName}</span></div>
+                        <div><span className="text-dark-500">Duration:</span> <span className="text-dark-200">{videoConfig.duration}s</span></div>
+                        <div><span className="text-dark-500">Size:</span> <span className="text-dark-200">{videoConfig.width}×{videoConfig.height}</span></div>
+                        <div><span className="text-dark-500">Style:</span> <span className="text-dark-200">{videoConfig.videoStyle}</span></div>
+                      </div>
                     </div>
-                  </div>
-                )}
-                
-                {/* Raw Prompt View */}
-                {resultView === 'raw' && videoResult.prompt && (
-                  <div className="p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-medium text-purple-300">📝 Video Prompt</span>
-                    </div>
-                    <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono bg-dark-900 p-3 rounded-lg">
-                      {videoResult.prompt}
-                    </pre>
-                  </div>
-                )}
-                
-                {/* Video Info */}
-                {videoResult.type === 'video' && resultView === 'rendered' && (
-                  <div className="p-3 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-                    <h4 className="text-xs font-medium text-dark-400 mb-2">Video Details</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-dark-500">Model:</span> <span className="text-dark-200">{currentVideoModel.displayName}</span></div>
-                      <div><span className="text-dark-500">Duration:</span> <span className="text-dark-200">{videoConfig.duration}s</span></div>
-                      <div><span className="text-dark-500">Size:</span> <span className="text-dark-200">{videoConfig.width}×{videoConfig.height}</span></div>
-                      <div><span className="text-dark-500">Style:</span> <span className="text-dark-200">{videoConfig.videoStyle}</span></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {/* Text Result */}
-            {configMode === 'text' && aiResult && (
-              <div className="flex-1 overflow-y-auto p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-                {resultView === 'raw' ? (
-                  <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono">{aiResult}</pre>
-                ) : (
-                  <div className="prose prose-invert max-w-none">{renderResult(aiResult, aiConfig.outputFormat)}</div>
-                )}
-              </div>
-            )}
-            
-            {/* No Result */}
-            {!aiResult && !videoResult && !aiError && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center text-dark-400">
-                  <p>No result generated</p>
+                  )}
                 </div>
-              </div>
-            )}
-            
-            <button 
-              onClick={handleReset} 
-              className={`mt-4 px-4 py-2.5 text-white font-medium rounded-xl flex items-center justify-center gap-2
+              )}
+
+              {/* Text Result */}
+              {configMode === 'text' && aiResult && (
+                <div className="flex-1 overflow-y-auto p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
+                  {resultView === 'raw' ? (
+                    <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono">{aiResult}</pre>
+                  ) : (
+                    <div className="prose prose-invert max-w-none">{renderResult(aiResult, aiConfig.outputFormat)}</div>
+                  )}
+                </div>
+              )}
+
+              {/* No Result */}
+              {!aiResult && !videoResult && !aiError && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center text-dark-400">
+                    <p>No result generated</p>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={handleReset}
+                className={`mt-4 px-4 py-2.5 text-white font-medium rounded-xl flex items-center justify-center gap-2
                 ${configMode === 'video' ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-primary-500 to-indigo-500'}`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Start New
-            </button>
-          </div>
-        )}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Start New
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

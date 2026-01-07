@@ -5,6 +5,10 @@ export interface Settings {
   apiKey: string;
   baseUrl: string;
   model: string;
+  apiMode: 'internal' | 'custom';
+  provider: 'gpt' | 'anthropic' | 'gemini' | 'grok' | 'deepseek' | 'others' | 'doubao' | 'qwen' | 'perplexity';
+  companyName: string;
+  brandName: string;
   wordpressApiUrl?: string;
   wordpressApiKey?: string;
   wordpressUsername?: string;
@@ -13,8 +17,12 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
-  baseUrl: 'https://api.poe.com/v1',
-  model: 'GPT-5.1',
+  baseUrl: 'https://api.openai.com/v1',
+  model: 'Doubao-pro-128k',
+  apiMode: 'internal',
+  provider: 'doubao',
+  companyName: '',
+  brandName: '',
   wordpressApiUrl: '',
   wordpressApiKey: '',
   wordpressUsername: '',
@@ -43,7 +51,7 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
 // Video models are accessed like any other model through the same API
 // Use "List available models" endpoint to find available video models
 // Reference: https://creator.poe.com/docs/poe-api-overview
-export type VideoModel = 
+export type VideoModel =
   // POE Video Models (check availability via List models API)
   | 'Sora'
   | 'Sora-Pro'
@@ -245,63 +253,21 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   systemPrompt: '',
 };
 
-// Available Models - Latest 2025 Models from POE
-// Reference: https://poe.com (check available models)
-export const AVAILABLE_MODELS = [
-  // Top Tier Models
-  'Gemini-3-Pro-Preview',
-  'Claude-Opus-4.5',
-  'GPT-5.1',
-  'GPT-5',
-  'Kimi-K2-Thinking',
-  'GPT-5.1-Codex',
-  'DeepSeek-V3.2',
-  'o3',
-  'Grok-4',
-  
-  // High Performance Models
-  'GPT-5-mini',
-  'Grok-4.1-Fast',
-  'KAT-Coder-Pro-V1',
-  'Claude-4.5-Sonnet',
-  'Nova-2.0-Pro-Preview',
-  'GPT-5.1-Codex-mini',
-  'MiniMax-M2',
-  'gpt-oss-120B',
-  'Grok-4-Fast',
-  
-  // Gemini Series
-  'Gemini-2.5-Pro',
-  'Gemini-2.5-Flash',
-  'Gemini-2.0-Flash',
-  
-  // DeepSeek Series
-  'DeepSeek-V3.2-Speciale',
-  'DeepSeek-V3.1-Terminus',
-  'DeepSeek-R1',
-  
-  // Amazon Nova Series
-  'Nova-2.0-Lite',
-  'Nova-2.0-Omni',
-  
-  // Qwen Series
-  'Qwen3-235B-A22B-2507',
-  'Qwen-2.5-Max',
-  
-  // Other Models
-  'Doubao-Seed-Code',
-  'Grok-3-mini-Reasoning',
-  'GLM-4.6',
-  
-  // Claude Series
-  'Claude-3.7-Sonnet',
-  'Claude-3.5-Sonnet',
-  'Claude-3.5-Haiku',
-  
-  // Mistral Series
-  'Mistral-Large-2',
-  'Codestral',
-];
+// Available Models - Flagship 2025 Models grouped by provider
+export const PROVIDER_MODELS: Record<string, string[]> = {
+  doubao: ['doubao-pro-128k', 'doubao-lite-128k', 'doubao-vision-preview'],
+  gpt: ['GPT-5.1', 'GPT-5', 'GPT-5-mini', 'o3'],
+  anthropic: ['Claude-Opus-4.5', 'Claude-4.5-Sonnet'],
+  gemini: ['Gemini-3-Pro-Preview', 'Gemini-2.5-Pro'],
+  grok: ['Grok-4', 'Grok-4.1-Fast'],
+  perplexity: ['sonar-reasoning-pro', 'sonar-pro', 'sonar'],
+  deepseek: ['DeepSeek-V3.2', 'DeepSeek-R1'],
+  qwen: ['Qwen3-235B', 'qwen-max-2025', 'qwen-plus'],
+  others: ['Kimi-K2', 'MiniMax-M2', 'Spark-Ultra'],
+};
+
+// Flat list for compatibility
+export const AVAILABLE_MODELS = Object.values(PROVIDER_MODELS).flat();
 
 // Page Content Types
 export interface PageContent {
@@ -343,7 +309,7 @@ export interface FormatTemplate {
 }
 
 // Message Types
-export type MessageType = 
+export type MessageType =
   | 'GET_PAGE_CONTENT'
   | 'GET_SELECTED_TEXT'
   | 'GET_SETTINGS'

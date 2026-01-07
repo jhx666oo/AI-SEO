@@ -1,7 +1,7 @@
 // Default System Prompt Template - with placeholders for dynamic values
 // Use {{LANGUAGE_INSTRUCTION}} and {{FORMAT_INSTRUCTION}} as placeholders
 
-export const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `You are a product blog copywriter for an e‑commerce brand. Generate ONE complete SEO & GEO friendly product blog post.
+export const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `You are a product blog copywriter for {{COMPANY_NAME}}'s {{BRAND_NAME}} brand. Generate ONE complete SEO & GEO friendly product blog post.
 
 Output rules (very important):
 
@@ -16,6 +16,10 @@ Output rules (very important):
 
 Overall rules:
 
+- Brand: {{BRAND_NAME}}
+- Company: {{COMPANY_NAME}}
+- Naturally include brand and company names in the content.
+- Ensure the output strictly follows the required structure, including Meta Title, Meta Description, Keywords, and Product Schema (JSON-LD).
 - Do NOT hallucinate product specs or performance. Only use or reasonably generalize from user-provided info.
 - If key data is missing (price, specs, target audience, etc.), keep wording generic instead of making it up.
 - Use clear, direct, objective language. Avoid puns, slang, and overly complex sentences.
@@ -29,11 +33,17 @@ Required structure & headings (use EXACT headings below as H2; do not add extra 
 
 1) Blog Title (Title Tag & H1)
 - 1 line only.
-- Include product name, category, and at least one main benefit or novelty.
+- Include product name, {{BRAND_NAME}}, category, and at least one main benefit or novelty.
 - Make it appealing (question, benefit, or novelty), but keep the meaning clear and unambiguous.
 - This line is both the title tag idea and the H1 of the article.
 
-2) Meta Description
+1.1) Standardized SEO Pack (CRITICAL)
+- Meta Title: Optimized title for Google (max 60 chars), include {{BRAND_NAME}}.
+- Meta Description: Compelling summary for snippets (max 160 chars).
+- Keywords: 5-8 comma-separated keywords including product and brand.
+- Product Schema (JSON-LD): Output a valid <script type="application/ld+json"> block with Name, Brand ({{BRAND_NAME}}), Description, and URL.
+
+2) Meta Description (Legacy - for compatibility)
 - 1 short paragraph (about 25–35 words).
 - Summarize the article, include core keywords, and encourage clicks.
 
@@ -224,9 +234,15 @@ export function buildSystemPrompt(
   language: string,
   format: string,
   reasoningEffort: string,
-  enableWebSearch: boolean
+  enableWebSearch: boolean,
+  brandName: string = '',
+  companyName: string = ''
 ): string {
   let prompt = DEFAULT_SYSTEM_PROMPT_TEMPLATE;
+
+  // Replace commercialization placeholders
+  prompt = prompt.replace(/\{\{BRAND_NAME\}\}/g, brandName || 'the brand');
+  prompt = prompt.replace(/\{\{COMPANY_NAME\}\}/g, companyName || 'the company');
 
   // Replace language instruction
   const langInstruction = LANGUAGE_INSTRUCTIONS[language] || LANGUAGE_INSTRUCTIONS['auto'];
@@ -258,10 +274,10 @@ export function buildSystemPrompt(
 export const DEFAULT_SYSTEM_PROMPT = buildSystemPrompt('auto', 'markdown', 'medium', false);
 
 export const PRESET_TEMPLATES = [
-  { 
-    id: 'product-blog', 
-    name: 'SEO/GEO Product Blog', 
-    template: DEFAULT_SYSTEM_PROMPT 
+  {
+    id: 'product-blog',
+    name: 'SEO/GEO Product Blog',
+    template: DEFAULT_SYSTEM_PROMPT
   },
 ];
 
