@@ -29,7 +29,7 @@ const INTERNAL_API_CONFIG: Record<string, { baseUrl: string; apiKey: string }> =
   },
   gemini: {
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    apiKey: 'AIzaSyCbskt1x5C2gHaN2eupxdGIlUhyUY1juqM',
+    apiKey: 'YOUR_GOOGLE_API_KEY', // 请在本地测试或通过环境变量配置，不要提交到远程仓库
   },
   // You can add more provider-specific internal keys here
 };
