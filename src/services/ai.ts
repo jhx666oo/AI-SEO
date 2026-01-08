@@ -32,27 +32,27 @@ const sessionToken = import.meta.env.VITE_INTERNAL_SESSION_TOKEN || 'internal-se
 const INTERNAL_API_CONFIG: Record<string, { baseUrl: string; apiKey: string }> = {
   doubao: {
     baseUrl: isProduction ? proxyBaseUrl : 'https://ark.cn-beijing.volces.com/api/v3',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_DOUBAO_API_KEY || 'YOUR_DOUBAO_API_KEY'),
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_DOUBAO_API_KEY || ''),
   },
   qwen: {
     baseUrl: isProduction ? proxyBaseUrl : 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_QWEN_API_KEY || 'YOUR_QWEN_API_KEY'),
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_QWEN_API_KEY || ''),
   },
   gpt: {
     baseUrl: isProduction ? proxyBaseUrl : 'https://api.openai.com/v1',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_OPENAI_API_KEY || 'YOUR_OPENAI_API_KEY'),
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_OPENAI_API_KEY || ''),
   },
   grok: {
     baseUrl: isProduction ? proxyBaseUrl : 'https://api.x.ai/v1',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_GROK_API_KEY || 'YOUR_GROK_API_KEY'),
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_GROK_API_KEY || ''),
   },
   gemini: {
     baseUrl: isProduction ? proxyBaseUrl : 'https://generativelanguage.googleapis.com/v1beta/openai',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_GEMINI_API_KEY || 'YOUR_GOOGLE_API_KEY'),
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_GEMINI_API_KEY || ''),
   },
   perplexity: {
     baseUrl: isProduction ? proxyBaseUrl : 'https://api.perplexity.ai',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_PERPLEXITY_API_KEY || 'YOUR_PERPLEXITY_API_KEY'),
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_PERPLEXITY_API_KEY || ''),
   },
 };
 
@@ -66,20 +66,24 @@ async function logUserActivity(data: {
   provider: string;
   model: string;
 }) {
+  console.log('[Audit Trail] Logging activity:', data);
+  // Disabled failing internal audit fetch for now to prevent console noise
+  return;
+  /*
   try {
-    console.log('[Audit Trail] Logging activity:', data);
-    // Asynchronous call to company backend
-    fetch('https://api.yourcompany.com/audit/log', {
+    const response = await fetch('https://api.yourcompany.com/audit/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...data,
         timestamp: new Date().toISOString(),
       }),
-    }).catch(err => console.error('[Audit Trail] Failed to log activity:', err));
+    });
+    if (!response.ok) console.warn('[Audit Trail] Logging failed');
   } catch (err) {
     console.error('[Audit Trail] Error in logUserActivity:', err);
   }
+  */
 }
 
 export async function sendToAI(
@@ -98,8 +102,12 @@ export async function sendToAI(
   const apiKey = isInternal ? internalConfig.apiKey : settings.apiKey;
 
   console.log('[AI Service] Mode:', settings.apiMode);
+  console.log('[AI Service] isProduction:', isProduction);
+  console.log('[AI Service] Vite Mode:', import.meta.env.MODE);
   console.log('[AI Service] Provider:', provider);
   console.log('[AI Service] Base URL:', baseUrl);
+  console.log('[AI Service] Resolved API Key Length:', apiKey ? apiKey.length : 'undefined/empty');
+  console.log('[AI Service] Resolved API Key Start:', apiKey ? apiKey.substring(0, 6) + '...' : 'none');
 
   if (!apiKey && !isInternal) {
     const errorMsg = 'API Key not configured. Please add your API key in Settings.';
@@ -160,12 +168,61 @@ export async function sendToAI(
 
   // Final provider-specific cleanup
   if (provider === 'gemini') {
-    // Ensure gemini models are prefixed and remove any OpenAI-specific fields that might cause 400
-    if (!requestBody.model.startsWith('models/')) {
-      if (requestBody.model.toLowerCase().includes('gemini')) {
-        requestBody.model = `models/${requestBody.model.toLowerCase()}`;
+    // Map 2025 model names to actual API model IDs
+    // OpenAI compatible endpoint requires lowercase model names without 'models/' prefix
+    const geminiMap: Record<string, string> = {
+      'Gemini-3-Pro-Preview': 'gemini-3-pro-preview', // Latest 2025 model - use lowercase format
+      'Gemini-2.5-Pro': 'gemini-2.5-pro', // Latest 2025 model - use lowercase format
+      'Gemini-2.0-Flash-Flagship': 'gemini-2.0-flash-flagship', // Latest 2025 model - use lowercase format
+    };
+
+    const originalModel = requestBody.model;
+    // First, try direct mapping
+    if (geminiMap[originalModel]) {
+      requestBody.model = geminiMap[originalModel];
+    } else {
+      // Convert to lowercase and try to map based on pattern
+      const lowerModel = originalModel.toLowerCase();
+      if (lowerModel.includes('3') && lowerModel.includes('pro') && lowerModel.includes('preview')) {
+        requestBody.model = 'gemini-3-pro-preview';
+      } else if (lowerModel.includes('2.5') && lowerModel.includes('pro')) {
+        requestBody.model = 'gemini-2.5-pro';
+      } else if (lowerModel.includes('2.0') && lowerModel.includes('flash')) {
+        requestBody.model = 'gemini-2.0-flash-flagship';
+      } else if (lowerModel.includes('pro')) {
+        // Fallback to latest Pro model
+        requestBody.model = 'gemini-2.5-pro';
+      } else if (lowerModel.includes('flash')) {
+        // Fallback to latest Flash model
+        requestBody.model = 'gemini-2.0-flash-flagship';
+      } else {
+        // Ensure all model names are lowercase for OpenAI compatible endpoint
+        requestBody.model = originalModel.toLowerCase();
       }
     }
+
+    // Google's OpenAI-compatible endpoint has issues with system role
+    // Merge system prompt into first user message
+    if (requestBody.messages && requestBody.messages.length > 0) {
+      const messages = [...requestBody.messages];
+      const systemMsg = messages.find((m: any) => m.role === 'system');
+      const userMsg = messages.find((m: any) => m.role === 'user');
+
+      if (systemMsg && userMsg) {
+        userMsg.content = `${typeof systemMsg.content === 'string' ? systemMsg.content : JSON.stringify(systemMsg.content)}\n\n${typeof userMsg.content === 'string' ? userMsg.content : JSON.stringify(userMsg.content)}`;
+        requestBody.messages = messages.filter((m: any) => m.role !== 'system');
+      }
+    }
+
+    // Remove 'models/' prefix if present - OpenAI compatible endpoint uses format without prefix
+    if (requestBody.model.startsWith('models/')) {
+      requestBody.model = requestBody.model.replace('models/', '');
+    }
+
+    // Final validation: ensure model name is lowercase (required by OpenAI compatible endpoint)
+    requestBody.model = requestBody.model.toLowerCase();
+    
+    console.log('[AI Service] Final Gemini model name:', requestBody.model);
   }
 
   // Production mode: add provider info for proxy routing
@@ -173,15 +230,41 @@ export async function sendToAI(
     requestBody.provider = provider;
   }
 
-  const apiUrl = `${baseUrl}/chat/completions`;
+  const isGeminiDirect = provider === 'gemini' && !isProduction;
+  let apiUrl = `${baseUrl}/chat/completions`;
+  const cleanKey = apiKey ? apiKey.trim().replace(/^["']|["']$/g, '') : '';
+
+  if (isGeminiDirect && cleanKey) {
+    // Adding to both URL and Header for maximum compatibility
+    apiUrl += `?key=${cleanKey}`;
+  }
+
+  console.log('[AI Service] Resolved API Key Start:', cleanKey ? cleanKey.substring(0, 7) + '...' : 'none/empty');
+  console.log('[AI Service] Endpoint:', apiUrl);
+  console.log('[AI Service] Resolved Model:', requestBody.model);
+
+  if (isInternal && !cleanKey) {
+    throw new Error(`Internal mode error: API Key for provider "${provider}" is missing. Please check your .env file and ensure it contains VITE_${provider.toUpperCase()}_API_KEY.`);
+  }
 
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (cleanKey) {
+      // Always try to include Authorization header, even for Google in dev
+      // Some proxies or local tunnels might need it
+      headers['Authorization'] = `Bearer ${cleanKey}`;
+
+      if (provider === 'gemini') {
+        headers['x-goog-api-key'] = cleanKey;
+      }
+    }
+
     const response = await fetch(apiUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify(requestBody),
     });
 
@@ -213,10 +296,13 @@ export async function sendToAI(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error('[AI Service] EXCEPTION:', errorMessage);
+    console.error('[AI Service] Exception details:', err);
+    console.error('[AI Service] Request URL was:', apiUrl);
+    console.error('[AI Service] Request body:', JSON.stringify(requestBody, null, 2));
 
     // Provide more specific error messages for common network errors
-    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
-      const networkError = 'Network error: Unable to connect to API. Please check your internet connection and Base URL.';
+    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('network')) {
+      const networkError = `Network error: Unable to connect to API endpoint "${apiUrl}". Please check your internet connection and verify the Base URL is correct. For Gemini, ensure you're using the correct endpoint: https://generativelanguage.googleapis.com/v1beta/openai`;
       console.error('[AI Service] Network error detected');
       return { content: '', error: networkError };
     }

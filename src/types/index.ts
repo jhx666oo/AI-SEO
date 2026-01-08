@@ -6,7 +6,7 @@ export interface Settings {
   baseUrl: string;
   model: string;
   apiMode: 'internal' | 'custom';
-  provider: 'gpt' | 'anthropic' | 'gemini' | 'grok' | 'deepseek' | 'others' | 'doubao' | 'qwen' | 'perplexity';
+  provider: 'gpt' | 'gemini' | 'grok' | 'doubao' | 'qwen' | 'perplexity';
   companyName: string;
   brandName: string;
   wordpressApiUrl?: string;
@@ -256,14 +256,11 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
 // Available Models - Flagship 2025 Models grouped by provider
 export const PROVIDER_MODELS: Record<string, string[]> = {
   doubao: ['doubao-pro-128k', 'doubao-lite-128k', 'doubao-vision-preview'],
-  gpt: ['GPT-5.1', 'GPT-5', 'GPT-5-mini', 'o3'],
-  anthropic: ['Claude-Opus-4.5', 'Claude-4.5-Sonnet'],
-  gemini: ['Gemini-3-Pro-Preview', 'Gemini-2.5-Pro', 'gemini-1.5-pro', 'gemini-1.5-flash'],
-  grok: ['Grok-4', 'Grok-4.1-Fast'],
-  perplexity: ['sonar-reasoning-pro', 'sonar-pro', 'sonar'],
-  deepseek: ['DeepSeek-V3.2', 'DeepSeek-R1'],
   qwen: ['Qwen3-235B', 'qwen-max-2025', 'qwen-plus'],
-  others: ['Kimi-K2', 'MiniMax-M2', 'Spark-Ultra'],
+  gpt: ['GPT-5.1', 'GPT-5', 'GPT-5-mini', 'o3'],
+  grok: ['Grok-4', 'Grok-4.1-Fast'],
+  gemini: ['Gemini-3-Pro-Preview', 'Gemini-2.5-Pro', 'Gemini-2.0-Flash-Flagship'],
+  perplexity: ['sonar-reasoning-pro', 'sonar-pro', 'sonar'],
 };
 
 // Flat list for compatibility

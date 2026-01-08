@@ -13,12 +13,11 @@ type SidePanel = 'sessions' | 'media' | null;
 
 const PROVIDERS_LIST = [
   { id: 'doubao', name: 'Doubao', company: '字节跳动', icon: '🍃', color: 'bg-emerald-500', desc: '高效全能' },
+  { id: 'qwen', name: 'Qwen', company: '通义千问', icon: '☁️', color: 'bg-indigo-500', desc: '逻辑严密' },
   { id: 'gpt', name: 'OpenAI', company: 'ChatGPT', icon: '🤖', color: 'bg-emerald-600', desc: '行业标杆' },
-  { id: 'anthropic', name: 'Anthropic', company: 'Claude', icon: '🎭', color: 'bg-orange-600', desc: '长篇理解' },
   { id: 'gemini', name: 'Google', company: 'Gemini', icon: '✨', color: 'bg-blue-500', desc: '多模态强' },
   { id: 'grok', name: 'xAI', company: 'Grok', icon: '🌌', color: 'bg-purple-600', desc: '实时互联' },
   { id: 'perplexity', name: 'Perplexity', company: 'Search', icon: '🔍', color: 'bg-cyan-500', desc: '百科全书' },
-  { id: 'qwen', name: 'Qwen', company: '通义千问', icon: '☁️', color: 'bg-indigo-500', desc: '逻辑严密' },
 ];
 
 export const App: React.FC = () => {
