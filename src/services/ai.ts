@@ -21,17 +21,39 @@ interface VideoResponse {
   error?: string;
 }
 
-// Commercialization logic settings (Internal/Corporate Mode)
+// Commercialization logic settings (Hybrid Mode: Dev + Production)
+// 开发环境：直连各供应商（使用环境变量）
+// 生产环境：统一走代理服务（安全）
+
+const isProduction = import.meta.env.MODE === 'production';
+const proxyBaseUrl = import.meta.env.VITE_PROXY_BASE_URL || 'https://api.yourcompany.com/v1/ai-proxy';
+const sessionToken = import.meta.env.VITE_INTERNAL_SESSION_TOKEN || 'internal-session-token';
+
 const INTERNAL_API_CONFIG: Record<string, { baseUrl: string; apiKey: string }> = {
-  default: {
-    baseUrl: 'https://api.yourcompany.com/v1',
-    apiKey: 'your-internal-api-key',
+  doubao: {
+    baseUrl: isProduction ? proxyBaseUrl : 'https://ark.cn-beijing.volces.com/api/v3',
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_DOUBAO_API_KEY || 'YOUR_DOUBAO_API_KEY'),
+  },
+  qwen: {
+    baseUrl: isProduction ? proxyBaseUrl : 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_QWEN_API_KEY || 'YOUR_QWEN_API_KEY'),
+  },
+  gpt: {
+    baseUrl: isProduction ? proxyBaseUrl : 'https://api.openai.com/v1',
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_OPENAI_API_KEY || 'YOUR_OPENAI_API_KEY'),
+  },
+  grok: {
+    baseUrl: isProduction ? proxyBaseUrl : 'https://api.x.ai/v1',
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_GROK_API_KEY || 'YOUR_GROK_API_KEY'),
   },
   gemini: {
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    apiKey: 'YOUR_GOOGLE_API_KEY', // 请在本地测试或通过环境变量配置，不要提交到远程仓库
+    baseUrl: isProduction ? proxyBaseUrl : 'https://generativelanguage.googleapis.com/v1beta/openai',
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_GEMINI_API_KEY || 'YOUR_GOOGLE_API_KEY'),
   },
-  // You can add more provider-specific internal keys here
+  perplexity: {
+    baseUrl: isProduction ? proxyBaseUrl : 'https://api.perplexity.ai',
+    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_PERPLEXITY_API_KEY || 'YOUR_PERPLEXITY_API_KEY'),
+  },
 };
 
 /**
@@ -71,7 +93,7 @@ export async function sendToAI(
   const provider = settings.provider;
 
   // Resolve config based on mode and provider
-  const internalConfig = INTERNAL_API_CONFIG[provider] || INTERNAL_API_CONFIG.default;
+  const internalConfig = INTERNAL_API_CONFIG[provider] || INTERNAL_API_CONFIG.gpt;
   const baseUrl = isInternal ? internalConfig.baseUrl : settings.baseUrl;
   const apiKey = isInternal ? internalConfig.apiKey : settings.apiKey;
 
@@ -144,6 +166,11 @@ export async function sendToAI(
         requestBody.model = `models/${requestBody.model.toLowerCase()}`;
       }
     }
+  }
+
+  // Production mode: add provider info for proxy routing
+  if (isProduction && isInternal) {
+    requestBody.provider = provider;
   }
 
   const apiUrl = `${baseUrl}/chat/completions`;
