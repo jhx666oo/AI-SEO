@@ -21,10 +21,17 @@ interface VideoResponse {
   error?: string;
 }
 
-// Commercialization logic settings
-const INTERNAL_API_CONFIG = {
-  baseUrl: 'https://api.yourcompany.com/v1', // ⚠️ 请在此处替换为公司生产环境 API 地址
-  apiKey: 'your-internal-api-key',          // ⚠️ 请在此处替换为公司生产环境 API Key
+// Commercialization logic settings (Internal/Corporate Mode)
+const INTERNAL_API_CONFIG: Record<string, { baseUrl: string; apiKey: string }> = {
+  default: {
+    baseUrl: 'https://api.yourcompany.com/v1',
+    apiKey: 'your-internal-api-key',
+  },
+  gemini: {
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    apiKey: 'AIzaSyCbskt1x5C2gHaN2eupxdGIlUhyUY1juqM',
+  },
+  // You can add more provider-specific internal keys here
 };
 
 /**
@@ -61,9 +68,12 @@ export async function sendToAI(
   console.log('[AI Service] ========== AI REQUEST STARTED ==========');
 
   const isInternal = settings.apiMode === 'internal';
-  const baseUrl = isInternal ? INTERNAL_API_CONFIG.baseUrl : settings.baseUrl;
-  const apiKey = isInternal ? INTERNAL_API_CONFIG.apiKey : settings.apiKey;
   const provider = settings.provider;
+
+  // Resolve config based on mode and provider
+  const internalConfig = INTERNAL_API_CONFIG[provider] || INTERNAL_API_CONFIG.default;
+  const baseUrl = isInternal ? internalConfig.baseUrl : settings.baseUrl;
+  const apiKey = isInternal ? internalConfig.apiKey : settings.apiKey;
 
   console.log('[AI Service] Mode:', settings.apiMode);
   console.log('[AI Service] Provider:', provider);
