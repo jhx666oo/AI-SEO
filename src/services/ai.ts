@@ -120,15 +120,12 @@ export async function sendToAI(
   };
 
   // Provider-specific adjustments
-  if (provider === 'gemini') {
-    // Example for Google Gemini specific format if needed
-    // requestBody = { ... }
-  } else if (provider === 'grok') {
+  if (provider === 'grok') {
     // Example for Grok specific format
   }
 
   // Add optional parameters
-  if (aiConfig.enableWebSearch) {
+  if (aiConfig.enableWebSearch && provider !== 'gemini') {
     requestBody.web_search = true;
   }
 
@@ -138,6 +135,16 @@ export async function sendToAI(
     'high': 1.0,
   };
   requestBody.temperature = reasoningMap[aiConfig.reasoningEffort] || 0.7;
+
+  // Final provider-specific cleanup
+  if (provider === 'gemini') {
+    // Ensure gemini models are prefixed and remove any OpenAI-specific fields that might cause 400
+    if (!requestBody.model.startsWith('models/')) {
+      if (requestBody.model.toLowerCase().includes('gemini')) {
+        requestBody.model = `models/${requestBody.model.toLowerCase()}`;
+      }
+    }
+  }
 
   const apiUrl = `${baseUrl}/chat/completions`;
 
