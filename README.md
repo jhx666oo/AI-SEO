@@ -24,12 +24,24 @@
 - **产品详情提取** - 自动提取产品名称、描述、规格等信息
 
 ### 🤖 AI 内容生成
-- **双态化配置 (Dual-Mode)** - 支持 **Internal Mode (内网 Agent)** 和 **DIY Mode (手动配置)**。
-- **2025 旗舰模型支持** - 全面适配 GPT-5.1、Claude-4.5、Gemini-3、Grok-4、DeepSeek-V3.2 等最新模型。
-- **文本生成** - 使用 AI 生成 SEO/GEO 优化的产品博客文章。
-- **视频生成** - 支持多种领先视频生成模型（Sora Pro、Veo-3、Kling 1.5 等）。
-- **内容审计 (Audit Trail)** - 自动记录品牌数据和商业活动，支持后端分析。
-- **自定义提示词** - 可基于公司品牌信息自定义系统提示词和生成参数。
+- **双态化配置 (Dual-Mode)** - 支持 **Internal Mode (内网 Agent)** 和 **DIY Mode (手动配置)**
+- **2025 旗舰模型支持** - 全面适配最新模型：
+  - **OpenAI**: GPT-5.2, GPT-5.1, GPT-5, GPT-5-mini, GPT-4o, GPT-o3, GPT-4o-mini
+  - **Google Gemini**: Gemini-3-Pro-Preview, Gemini-3-Flash-Preview, Gemini-2.5-Pro, Gemini-2.5-Flash
+  - **Grok**: grok-4-1-fast-reasoning, grok-code-fast-1
+  - **通义千问**: qwen-max, qwen-max-latest, qwen-max-0125, qwen-flash
+  - **豆包**: doubao-seed-1-8-251228, doubao-seed-1-6-lite-251015, doubao-seed-1-6-flash-250828
+  - **Perplexity**: sonar, sonar-pro, sonar-reasoning-pro, sonar-deep-research
+- **文本生成** - 使用 AI 生成 SEO/GEO 优化的产品博客文章
+- **视频生成** - 支持多种领先视频生成模型：
+  - **OpenAI**: Sora-2, Sora-2-Pro
+  - **Google Veo**: Veo-3.1, Veo-3.0 系列
+  - **通义千问**: Wan 2.6 T2V, Wan 2.5 T2V Preview, Wan 2.2 T2V Plus
+  - **豆包**: Doubao Seedance 1.5 Pro
+- **模型测试功能** - 一键测试所有配置的模型，验证 API Key 和连接性
+- **智能错误处理** - 友好的错误提示，自动检测 API Key 失效、模型名称错误等问题
+- **内容审计 (Audit Trail)** - 自动记录品牌数据和商业活动，支持后端分析
+- **自定义提示词** - 可基于公司品牌信息自定义系统提示词和生成参数
 
 ### ⚙️ 内容配置
 - **输出语言** - 支持 12+ 种语言（中文、English、日本語、Русский 等）
@@ -48,10 +60,11 @@
 - **配置保存** - 自动保存 AI 配置和视频配置
 
 ### 🎬 视频生成
-- **多种模型** - Sora、Sora Pro、Veo-2、Veo-3、Runway Gen-3、Kling Video 等
+- **多种模型** - Sora-2、Sora-2-Pro、Veo-3.1、Veo-3.0 系列、Wan 2.6 T2V、Doubao Seedance 1.5 Pro 等
 - **自定义参数** - 时长、分辨率、宽高比、品牌信息等
 - **图片参考** - 支持使用参考图片生成视频
-- **音频支持** - 部分模型支持音频生成
+- **音频支持** - 部分模型（如 Veo-3.1、Sora-2-Pro）支持音频生成
+- **CORS 绕过** - 通过 Chrome Extension Background Script 自动处理跨域问题
 
 ## 🛠️ 技术栈
 
@@ -410,11 +423,57 @@
 
 ### API 配置
 
-#### POE API
+#### Internal Mode (推荐)
 
-- **Base URL**: `https://api.poe.com/v1`（默认）
-- **API Key**: 从 [Poe Creator Platform](https://creator.poe.com) 获取
-- **支持模型**: GPT-5、Claude、Gemini、DeepSeek、Grok 等 50+ 模型
+- **模式**: Internal Mode
+- **API Key 管理**: 通过环境变量 `.env` 文件配置（不提交到 Git）
+- **支持提供商**: 
+  - OpenAI (gpt)
+  - Google Gemini (gemini)
+  - Grok/xAI (grok)
+  - 通义千问 (qwen)
+  - 豆包 (doubao)
+  - Perplexity (perplexity)
+- **优势**: API Key 安全，集中管理，自动路由
+- **配置方法**: 详见 [API Key 管理文档](./docs/INTERNAL_MODE_API_KEY_MANAGEMENT.md)
+
+#### DIY Mode (手动配置)
+
+- **模式**: DIY Mode (Custom)
+- **需要手动配置**: Base URL 和 API Key
+- **适用场景**: 使用自定义 API 服务或代理
+
+### 模型测试
+
+项目内置模型测试功能，可在设置面板中一键测试所有配置的模型：
+
+1. 打开设置面板（点击右上角 ⚙️ 图标）
+2. 切换到 **Internal Mode**
+3. 在底部找到 "🧪 Model Testing" 部分
+4. 点击 "🚀 Test All Models" 按钮
+5. 查看测试结果（✓ 成功 / ✗ 错误）
+
+测试功能会自动：
+- 遍历所有提供商的模型
+- 发送简单的测试请求
+- 显示每个模型的连接状态
+- 提供友好的错误提示
+
+### 模型名称规范
+
+系统会自动处理模型名称的大小写和格式：
+
+- **OpenAI**: 自动转换为小写（GPT-4o → gpt-4o）
+- **Perplexity**: 自动转换为小写加连字符（Sonar Pro → sonar-pro）
+- **Gemini**: 自动转换为小写格式
+- **豆包**: 使用 Endpoint ID (ep-xxx)，不进行转换
+- **通义千问**: qwen3-max 自动映射为 qwen-max
+
+### 特殊模型注意事项
+
+- **推理模型 (o1, o3)**: temperature 固定为 1，不支持自定义
+- **GPT-5 系列**: temperature 固定为 1
+- **豆包**: Model 字段应填写 Endpoint ID，而非模型名称
 
 #### XOOBAY API
 
@@ -432,25 +491,54 @@
 
 ### 支持的 AI 模型
 
-#### 文本生成模型 (2025 Flagship)
+#### 文本生成模型 (2025 官方模型列表)
 
-- **OpenAI**: GPT-5.1, GPT-5, GPT-5-mini, o3-high
-- **Anthropic**: Claude-Opus-4.5, Claude-4.5-Sonnet
-- **Google**: Gemini-3-Pro-Preview, Gemini-2.5-Pro, Gemini-2.0-Flash
-- **xAI**: Grok-4, Grok-4.1-Fast
-- **DeepSeek**: DeepSeek-V3.2, DeepSeek-R1 (推理引擎)
-- **Perplexity**: Sonar-Reasoning-Pro, Sonar-Pro (实时搜索)
-- **其他**: Qwen3-235B, Kimi-K2, MiniMax-M2 (ABAB)
+- **OpenAI**: 
+  - GPT-5.2, GPT-5.1, GPT-5, GPT-5-mini
+  - GPT-4o, GPT-4o-mini
+  - o3, o3-mini (推理模型，temperature 固定为 1)
+  - o1, o1-preview, o1-mini (推理模型，temperature 固定为 1)
+- **Google Gemini**: 
+  - Gemini-3-Pro-Preview, Gemini-3-Flash-Preview
+  - Gemini-2.5-Pro, Gemini-2.5-Flash, Gemini-2.5-Flash-Lite
+  - Gemini-2.0-Flash
+- **Grok (xAI)**: 
+  - grok-4-1-fast-reasoning (文本、图像生文)
+  - grok-code-fast-1 (代码生成)
+  - grok-2-image-1212 (生图)
+- **通义千问 (Qwen)**: 
+  - qwen-max (注意：qwen3-max 会自动映射为 qwen-max)
+  - qwen-max-latest, qwen-max-0125
+  - qwen-flash
+- **豆包 (Doubao)**: 
+  - doubao-seed-1-8-251228 (深度思考)
+  - doubao-seed-1-6-lite-251015 (深度思考)
+  - doubao-seed-1-6-flash-250828 (深度思考)
+  - ⚠️ **注意**: Doubao Model 字段应填写 Endpoint ID (ep-xxx)，而非模型名称
+- **Perplexity**: 
+  - sonar (搜索模型)
+  - sonar-pro (搜索模型)
+  - sonar-reasoning-pro (搜索模型)
+  - sonar-deep-research (搜索模型)
 
-#### 视频生成模型
+#### 视频生成模型 (官方列表)
 
-- **OpenAI**: Sora, Sora Pro
-- **Google**: Veo-2, Veo-3
-- **Runway**: Runway Gen-3 Alpha
-- **Kuaishou**: Kling Video, Kling 1.5
-- **MiniMax**: Hailuo Video
-- **Pika**: Pika Video
-- **Luma**: Luma Dream Machine
+- **OpenAI**: 
+  - sora-2 (支持图片参考，最大 20 秒)
+  - sora-2-pro (支持图片参考和音频，最大 60 秒)
+- **Google Veo**: 
+  - veo-3.1-generate-preview (支持音频，1920x1080)
+  - veo-3.1-fast-generate-preview (快速预览，1280x720)
+  - veo-3.0-generate-001 (稳定版，支持音频)
+  - veo-3.0-fast-generate-001 (快速版本)
+- **通义千问**: 
+  - wan2.6-t2v (Text-to-Video)
+  - wan2.5-t2v-preview (预览版)
+  - wan2.2-t2v-plus (增强版)
+- **豆包**: 
+  - doubao-seedance-1-5-pro-251215 (支持音频，1920x1080，最大 15 秒)
+
+> **注意**: 所有模型名称已更新为官方 API ID，支持自动大小写转换和格式规范化。
 
 ## 📁 项目结构
 
@@ -458,33 +546,41 @@
 .
 ├── public/                 # 静态资源
 │   └── icons/             # 图标文件
+├── docs/                   # 文档目录
+│   ├── IMPLEMENTATION_GUIDE.md           # 实施指南
+│   └── INTERNAL_MODE_API_KEY_MANAGEMENT.md  # API Key 管理文档
 ├── src/
-│   ├── background/        # Background Script（保留，用于未来扩展）
-│   ├── content/           # Content Script（保留，用于未来扩展）
+│   ├── background/        # Chrome Extension Background Script
+│   │   └── index.ts       # 处理视频生成请求（绕过 CORS）
+│   ├── content/           # Content Script（保留）
 │   ├── hooks/             # React Hooks
 │   │   ├── useAI.ts       # AI 请求逻辑
 │   │   ├── useSession.ts  # 会话管理
 │   │   ├── useSettings.ts # 设置管理
 │   │   └── useXoobay.ts   # XOOBAY API 集成
 │   ├── services/          # API 服务
-│   │   ├── ai.ts          # AI API 调用
+│   │   ├── ai.ts          # AI API 调用（包含模型名称规范化）
 │   │   ├── wordpress.ts   # WordPress API 调用
 │   │   └── xoobay.ts      # XOOBAY API 调用
 │   ├── sidepanel/         # 主应用界面
-│   │   ├── App.tsx        # 主组件
+│   │   ├── App.tsx        # 主组件（包含模型测试功能）
 │   │   └── main.tsx       # 入口文件
 │   ├── types/             # TypeScript 类型定义
-│   │   └── index.ts       # 所有类型定义
+│   │   └── index.ts       # 所有类型定义（包含最新模型列表）
 │   ├── utils/             # 工具函数
 │   │   ├── storage.ts     # 本地存储工具
 │   │   └── templates.ts   # 提示词模板
 │   └── index.css          # 全局样式
+├── .gitignore             # Git 忽略文件（确保 .env 不被提交）
 ├── index.html             # HTML 入口
+├── manifest.json          # Chrome Extension 清单文件
 ├── package.json           # 项目配置
 ├── tsconfig.json          # TypeScript 配置
 ├── vite.config.ts         # Vite 配置
 └── tailwind.config.js     # Tailwind CSS 配置
 ```
+
+> **重要**: `.env` 文件包含敏感信息，已被 `.gitignore` 排除，不会被提交到 Git。
 
 ## 🔧 开发
 
@@ -518,11 +614,35 @@ npx tsc --noEmit
 
 ## 📝 注意事项
 
-1. **API Key 安全**: API Key 存储在浏览器 LocalStorage 中，请确保部署在 HTTPS 环境下
-2. **跨域问题**: XOOBAY API 需要配置 CORS，建议部署在公司域名下
-3. **WordPress 权限**: 确保 WordPress API 用户有足够的权限编辑产品
-4. **视频生成时间**: 视频生成可能需要较长时间，请耐心等待
-5. **浏览器兼容性**: 建议使用现代浏览器（Chrome、Firefox、Edge、Safari 最新版）
+1. **API Key 安全**: 
+   - ⚠️ **重要**: 不要将 `.env` 文件提交到 Git
+   - API Key 存储在浏览器 LocalStorage 中，请确保部署在 HTTPS 环境下
+   - 使用 Internal Mode 时，API Key 通过环境变量管理，更安全
+   - 详细配置方法请参考 [API Key 管理文档](./docs/INTERNAL_MODE_API_KEY_MANAGEMENT.md)
+
+2. **模型配置**:
+   - 豆包 (Doubao) 需要填写 Endpoint ID (ep-xxx)，而非模型名称
+   - OpenAI 模型名称会自动转换为小写格式
+   - Perplexity 模型名称会自动转换为小写加连字符格式
+   - 推理模型 (o1, o3) 和 GPT-5 系列自动设置 temperature = 1
+
+3. **跨域问题**: 
+   - XOOBAY API 需要配置 CORS，建议部署在公司域名下
+   - Google Veo 视频生成通过 Chrome Extension Background Script 自动处理跨域
+   - 如遇到跨域错误，系统会显示友好的错误提示
+
+4. **错误处理**:
+   - 系统会自动检测 API Key 失效 (403 错误)
+   - 自动检测模型名称拼写错误 (404 错误)
+   - 提供友好的中文错误提示
+
+5. **WordPress 权限**: 确保 WordPress API 用户有足够的权限编辑产品
+
+6. **视频生成时间**: 视频生成可能需要较长时间，请耐心等待
+
+7. **浏览器兼容性**: 建议使用现代浏览器（Chrome、Firefox、Edge、Safari 最新版）
+
+8. **Chrome Extension**: 本项目同时支持作为 Chrome Extension 和 Web 应用使用
 
 ## 🤝 贡献
 

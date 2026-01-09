@@ -172,7 +172,7 @@ DOUBAO_API_KEY=xxxxx
 QWEN_API_KEY=sk-xxxxx
 OPENAI_API_KEY=sk-proj-xxxxx
 GROK_API_KEY=xai-xxxxx
-GEMINI_API_KEY=AIzaSyCbskt1x5C2gHaN2eupxdGIlUhyUY1juqM
+GEMINI_API_KEY=AIzaSy_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 PERPLEXITY_API_KEY=pplx-xxxxx
 ```
 
@@ -233,7 +233,7 @@ VITE_DOUBAO_API_KEY=xxxxx
 VITE_QWEN_API_KEY=sk-xxxxx
 VITE_OPENAI_API_KEY=sk-proj-xxxxx
 VITE_GROK_API_KEY=xai-xxxxx
-VITE_GEMINI_API_KEY=AIzaSyCbskt1x5C2gHaN2eupxdGIlUhyUY1juqM
+VITE_GEMINI_API_KEY=AIzaSy_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 VITE_PERPLEXITY_API_KEY=pplx-xxxxx
 ```
 
@@ -299,7 +299,7 @@ const INTERNAL_API_CONFIG: Record<string, { baseUrl: string; apiKey: string }> =
    - `VITE_QWEN_API_KEY` = `sk-xxxxx`
    - `VITE_OPENAI_API_KEY` = `sk-proj-xxxxx`
    - `VITE_GROK_API_KEY` = `xai-xxxxx`
-   - `VITE_GEMINI_API_KEY` = `AIzaSyCbskt1x5C2gHaN2eupxdGIlUhyUY1juqM`
+   - `VITE_GEMINI_API_KEY` = `AIzaSy_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
    - `VITE_PERPLEXITY_API_KEY` = `pplx-xxxxx`
 4. 重新部署项目
 

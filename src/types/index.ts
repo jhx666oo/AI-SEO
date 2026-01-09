@@ -52,7 +52,18 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
 // Use "List available models" endpoint to find available video models
 // Reference: https://creator.poe.com/docs/poe-api-overview
 export type VideoModel =
-  // POE Video Models (check availability via List models API)
+  // Official Video Models
+  | 'sora-2'
+  | 'sora-2-pro'
+  | 'veo-3.1-generate-preview'
+  | 'veo-3.1-fast-generate-preview'
+  | 'veo-3.0-generate-001'
+  | 'veo-3.0-fast-generate-001'
+  | 'doubao-seedance-1-5-pro-251215'
+  | 'wan2.6-t2v'
+  | 'wan2.5-t2v-preview'
+  | 'wan2.2-t2v-plus'
+  // Legacy models (for backward compatibility)
   | 'Sora'
   | 'Sora-Pro'
   | 'Veo-2'
@@ -63,7 +74,7 @@ export type VideoModel =
   | 'Hailuo-Video'
   | 'Pika-Video'
   | 'Luma-Dream-Machine'
-  // Custom video bot (user can create their own)
+  // Custom video model (user can create their own)
   | string;
 
 export interface VideoModelConfig {
@@ -80,14 +91,12 @@ export interface VideoModelConfig {
   provider: string;
 }
 
-// POE Video Models
-// Note: Availability depends on POE platform - check with List available models API
-// These are common video models that may be available on POE
+// Official Video Models - Updated based on official API documentation
 export const VIDEO_MODELS: VideoModelConfig[] = [
   // OpenAI Sora
   {
-    name: 'Sora',
-    displayName: 'Sora',
+    name: 'sora-2',
+    displayName: 'Sora 2',
     maxDuration: 20,
     minDuration: 5,
     durationStep: 1,
@@ -95,26 +104,39 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     defaultHeight: 1080,
     supportsImageReference: true,
     supportsSoundGeneration: false,
-    description: 'OpenAI Sora video generation model',
+    description: 'OpenAI Sora 2 video generation model',
     provider: 'OpenAI',
   },
   {
-    name: 'Sora-Pro',
-    displayName: 'Sora Pro',
+    name: 'sora-2-pro',
+    displayName: 'Sora 2 Pro',
     maxDuration: 60,
     minDuration: 5,
     durationStep: 1,
     defaultWidth: 1920,
     defaultHeight: 1080,
     supportsImageReference: true,
-    supportsSoundGeneration: false,
-    description: 'OpenAI Sora Pro - longer videos',
+    supportsSoundGeneration: true,
+    description: 'OpenAI Sora 2 Pro - enhanced quality and longer videos',
     provider: 'OpenAI',
   },
   // Google Veo
   {
-    name: 'Veo-2',
-    displayName: 'Google Veo 2',
+    name: 'veo-3.1-generate-preview',
+    displayName: 'Google Veo 3.1',
+    maxDuration: 10,
+    minDuration: 4,
+    durationStep: 1,
+    defaultWidth: 1920,
+    defaultHeight: 1080,
+    supportsImageReference: true,
+    supportsSoundGeneration: true,
+    description: 'Google Veo 3.1 - latest preview version with audio support',
+    provider: 'Google',
+  },
+  {
+    name: 'veo-3.1-fast-generate-preview',
+    displayName: 'Google Veo 3.1 Fast',
     maxDuration: 8,
     minDuration: 4,
     durationStep: 1,
@@ -122,21 +144,88 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     defaultHeight: 720,
     supportsImageReference: true,
     supportsSoundGeneration: false,
-    description: 'Google Veo 2 video generation',
+    description: 'Google Veo 3.1 Fast - faster generation for quick previews',
     provider: 'Google',
   },
   {
-    name: 'Veo-3',
-    displayName: 'Google Veo 3',
-    maxDuration: 8,
+    name: 'veo-3.0-generate-001',
+    displayName: 'Google Veo 3.0',
+    maxDuration: 10,
     minDuration: 4,
     durationStep: 1,
     defaultWidth: 1920,
     defaultHeight: 1080,
     supportsImageReference: true,
     supportsSoundGeneration: true,
-    description: 'Google Veo 3 with audio support',
+    description: 'Google Veo 3.0 stable version',
     provider: 'Google',
+  },
+  {
+    name: 'veo-3.0-fast-generate-001',
+    displayName: 'Google Veo 3.0 Fast',
+    maxDuration: 8,
+    minDuration: 4,
+    durationStep: 1,
+    defaultWidth: 1280,
+    defaultHeight: 720,
+    supportsImageReference: true,
+    supportsSoundGeneration: false,
+    description: 'Google Veo 3.0 Fast - faster generation',
+    provider: 'Google',
+  },
+  // Doubao Video
+  {
+    name: 'doubao-seedance-1-5-pro-251215',
+    displayName: 'Doubao Seedance 1.5 Pro',
+    maxDuration: 15,
+    minDuration: 5,
+    durationStep: 1,
+    defaultWidth: 1920,
+    defaultHeight: 1080,
+    supportsImageReference: true,
+    supportsSoundGeneration: true,
+    description: 'Doubao Seedance 1.5 Pro video generation',
+    provider: 'Doubao',
+  },
+  // Qwen Video
+  {
+    name: 'wan2.6-t2v',
+    displayName: 'Wan 2.6 T2V',
+    maxDuration: 10,
+    minDuration: 5,
+    durationStep: 1,
+    defaultWidth: 1920,
+    defaultHeight: 1080,
+    supportsImageReference: true,
+    supportsSoundGeneration: false,
+    description: 'Qwen Wan 2.6 Text-to-Video',
+    provider: 'Qwen',
+  },
+  {
+    name: 'wan2.5-t2v-preview',
+    displayName: 'Wan 2.5 T2V Preview',
+    maxDuration: 10,
+    minDuration: 5,
+    durationStep: 1,
+    defaultWidth: 1920,
+    defaultHeight: 1080,
+    supportsImageReference: true,
+    supportsSoundGeneration: false,
+    description: 'Qwen Wan 2.5 Text-to-Video Preview',
+    provider: 'Qwen',
+  },
+  {
+    name: 'wan2.2-t2v-plus',
+    displayName: 'Wan 2.2 T2V Plus',
+    maxDuration: 10,
+    minDuration: 5,
+    durationStep: 1,
+    defaultWidth: 1920,
+    defaultHeight: 1080,
+    supportsImageReference: true,
+    supportsSoundGeneration: false,
+    description: 'Qwen Wan 2.2 Text-to-Video Plus',
+    provider: 'Qwen',
   },
   // Runway
   {
@@ -239,7 +328,7 @@ export interface VideoConfig {
 }
 
 export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
-  model: 'Sora',
+  model: 'sora-2',
   duration: 5,
   width: 1920,
   height: 1080,
@@ -253,14 +342,48 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   systemPrompt: '',
 };
 
-// Available Models - Flagship 2025 Models grouped by provider
+// Available Models - Official 2025 Models grouped by provider
+// Updated based on official API documentation
 export const PROVIDER_MODELS: Record<string, string[]> = {
-  doubao: ['doubao-pro-128k', 'doubao-lite-128k', 'doubao-vision-preview'],
-  qwen: ['Qwen3-235B', 'qwen-max-2025', 'qwen-plus'],
-  gpt: ['GPT-5.1', 'GPT-5', 'GPT-5-mini', 'o3'],
-  grok: ['Grok-4', 'Grok-4.1-Fast'],
-  gemini: ['Gemini-3-Pro-Preview', 'Gemini-2.5-Pro', 'Gemini-2.0-Flash-Flagship'],
-  perplexity: ['sonar-reasoning-pro', 'sonar-pro', 'sonar'],
+  doubao: [
+    // Legacy model names (for reference only - not recommended for production):
+    'doubao-seed-1-8-251228',     // 深度思考 (deprecated: use Endpoint ID instead)
+    'doubao-seed-1-6-lite-251015', // 深度思考 (deprecated: use Endpoint ID instead)
+    'doubao-seed-1-6-flash-250828', // 深度思考 (deprecated: use Endpoint ID instead)
+  ],
+  qwen: [
+    'qwen-max',                   // 通义千问 (official ID, qwen3-max maps to this)
+    'qwen-max-latest',            // 通义千问
+    'qwen-max-0125',              // 通义千问
+    'qwen-flash',                 // 通义千问
+  ],
+  gpt: [
+    'gpt-5.2',                    // OpenAI GPT-5.2
+    'gpt-5.1',                    // OpenAI GPT-5.1
+    'gpt-5',                      // OpenAI GPT-5
+    'gpt-5-mini',                 // OpenAI GPT-5 Mini
+    'GPT-4o',                     // OpenAI GPT-4o
+    'GPT-o3',                     // OpenAI O3
+    'GPT-4o-mini',                // OpenAI GPT-4o Mini
+  ],
+  grok: [
+    'grok-4-1-fast-reasoning',    // Grok 文本、图像生文
+    'grok-code-fast-1',           // Grok 代码生成
+  ],
+  gemini: [
+    'gemini-3-pro-preview',       // Google Gemini 3 Pro
+    'gemini-3-flash-preview',     // Google Gemini 3 Flash
+    'gemini-2.5-flash',           // Google Gemini 2.5 Flash
+    'gemini-2.5-flash-lite',      // Google Gemini 2.5 Flash Lite
+    'gemini-2.5-pro',             // Google Gemini 2.5 Pro
+    'gemini-2.0-flash',           // Google Gemini 2.0 Flash
+  ],
+  perplexity: [
+    'sonar',                      // Perplexity Sonar (official format: lowercase)
+    'sonar-pro',                  // Perplexity Sonar Pro (official format: lowercase with hyphen)
+    'sonar-reasoning-pro',        // Perplexity Sonar Reasoning Pro (official format: lowercase with hyphens)
+    'sonar-deep-research',        // Perplexity Sonar Deep Research (official format: lowercase with hyphens)
+  ],
 };
 
 // Flat list for compatibility
@@ -312,7 +435,8 @@ export type MessageType =
   | 'GET_SETTINGS'
   | 'SAVE_SETTINGS'
   | 'AI_REQUEST'
-  | 'VIDEO_REQUEST';
+  | 'VIDEO_REQUEST'
+  | 'GENERATE_VIDEO_VEO';
 
 export interface ChromeMessage {
   type: MessageType;

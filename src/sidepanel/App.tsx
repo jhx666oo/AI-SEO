@@ -3,8 +3,9 @@ import { useSettings } from '@/hooks/useSettings';
 import { useAI } from '@/hooks/useAI';
 import { useSession } from '@/hooks/useSession';
 import { useXoobay } from '@/hooks/useXoobay';
-import { PageContent, ImageInfo, AIConfig, DEFAULT_AI_CONFIG, VideoConfig, DEFAULT_VIDEO_CONFIG, VideoModel, XoobayLanguage, PROVIDER_MODELS, AVAILABLE_MODELS, VIDEO_MODELS } from '@/types';
+import { PageContent, ImageInfo, AIConfig, DEFAULT_AI_CONFIG, VideoConfig, DEFAULT_VIDEO_CONFIG, VideoModel, XoobayLanguage, PROVIDER_MODELS, AVAILABLE_MODELS, VIDEO_MODELS, Settings } from '@/types';
 import { buildSystemPrompt, OUTPUT_LANGUAGES, OUTPUT_FORMATS, REASONING_LEVELS, buildVideoSystemPrompt, VIDEO_OUTPUT_LANGUAGES, VIDEO_STYLES } from '@/utils/templates';
+import { sendToAI } from '@/services/ai';
 
 type Step = 'read' | 'edit' | 'config' | 'result';
 type ResultView = 'rendered' | 'raw';
@@ -74,6 +75,10 @@ export const App: React.FC = () => {
   const [editingSessionName, setEditingSessionName] = useState('');
   const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
   const [editingMediaName, setEditingMediaName] = useState('');
+
+  // Model testing state
+  const [testingModels, setTestingModels] = useState<boolean>(false);
+  const [testResults, setTestResults] = useState<Record<string, { status: 'pending' | 'testing' | 'success' | 'error'; message?: string; response?: string }>>({});
 
   // Config mode: text generation vs video generation
   const [configMode, setConfigMode] = useState<ConfigMode>('text');
@@ -382,6 +387,106 @@ export const App: React.FC = () => {
     setEditedContent('');
     setSelectedImages([]);
     clearResult();
+  };
+
+  // Test all configured models
+  const handleTestAllModels = async () => {
+    if (testingModels) return;
+
+    setTestingModels(true);
+    setTestResults({});
+
+    const testPrompt = 'Say "Hello" in one sentence.';
+    const modelsToTest: Array<{ provider: string; model: string; displayName: string }> = [];
+
+    // Collect all models from all providers
+    Object.entries(PROVIDER_MODELS).forEach(([provider, models]) => {
+      models.forEach(model => {
+        modelsToTest.push({
+          provider,
+          model,
+          displayName: `${PROVIDERS_LIST.find(p => p.id === provider)?.name || provider} - ${model}`,
+        });
+      });
+    });
+
+    // Initialize all as pending
+    const initialResults: typeof testResults = {};
+    modelsToTest.forEach(({ displayName }) => {
+      initialResults[displayName] = { status: 'pending' };
+    });
+    setTestResults(initialResults);
+
+    // Test each model sequentially
+    for (const { provider, model, displayName } of modelsToTest) {
+      setTestResults(prev => ({
+        ...prev,
+        [displayName]: { status: 'testing' },
+      }));
+
+      try {
+        // Create test settings for this model
+        const testSettings: Settings = {
+          ...settings,
+          provider: provider as any,
+          model: model,
+          apiMode: 'internal', // Always use internal mode for testing
+        };
+
+        // Create minimal AI config for testing
+        const testAiConfig: AIConfig = {
+          ...DEFAULT_AI_CONFIG,
+          systemPrompt: 'You are a helpful assistant.',
+          outputLanguage: 'auto',
+          outputFormat: 'markdown',
+          reasoningEffort: 'low',
+          enableWebSearch: false,
+        };
+
+        // Send test request directly using sendToAI service
+        const result = await sendToAI(testPrompt, testSettings, testAiConfig);
+
+        if (result.error) {
+          setTestResults(prev => ({
+            ...prev,
+            [displayName]: {
+              status: 'error',
+              message: result.error || 'Unknown error',
+            },
+          }));
+        } else if (result.content) {
+          const preview = result.content.substring(0, 100).replace(/\n/g, ' ');
+          setTestResults(prev => ({
+            ...prev,
+            [displayName]: {
+              status: 'success',
+              response: preview,
+            },
+          }));
+        } else {
+          setTestResults(prev => ({
+            ...prev,
+            [displayName]: {
+              status: 'error',
+              message: 'No response received',
+            },
+          }));
+        }
+      } catch (error) {
+        setTestResults(prev => ({
+          ...prev,
+          [displayName]: {
+            status: 'error',
+            message: error instanceof Error ? error.message : String(error),
+          },
+        }));
+      }
+
+      // Small delay between tests to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    setTestingModels(false);
   };
 
   const handleCopy = (text: string) => {
@@ -1277,6 +1382,93 @@ export const App: React.FC = () => {
               <p className="text-xs text-dark-500 mt-2">
                 Available video models: Sora, Veo, Runway, Kling, Hailuo, Pika, Luma
               </p>
+            </div>
+
+            {/* Model Testing Section */}
+            <div className="p-3 bg-blue-900/20 rounded-xl border border-blue-700/50 space-y-3">
+              <h4 className="text-xs font-semibold text-blue-400 flex items-center gap-2">
+                🧪 Model Testing
+              </h4>
+              <p className="text-xs text-dark-400">
+                Test all configured models to verify API keys and connectivity.
+              </p>
+              <button
+                onClick={handleTestAllModels}
+                disabled={testingModels || settings.apiMode !== 'internal'}
+                className={`w-full px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                  testingModels
+                    ? 'bg-blue-500/50 text-blue-300 cursor-not-allowed'
+                    : settings.apiMode !== 'internal'
+                    ? 'bg-dark-700 text-dark-500 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
+              >
+                {testingModels ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Testing Models...
+                  </span>
+                ) : (
+                  '🚀 Test All Models'
+                )}
+              </button>
+
+              {settings.apiMode !== 'internal' && (
+                <p className="text-xs text-amber-400">
+                  ⚠️ Model testing is only available in Internal Mode. Switch to Internal Mode to test models.
+                </p>
+              )}
+
+              {/* Test Results */}
+              {Object.keys(testResults).length > 0 && (
+                <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                  <div className="text-xs text-dark-400 font-medium mb-2">Test Results:</div>
+                  {Object.entries(testResults).map(([displayName, result]) => (
+                    <div
+                      key={displayName}
+                      className={`p-2 rounded-lg border text-xs ${
+                        result.status === 'success'
+                          ? 'bg-emerald-900/20 border-emerald-700/50'
+                          : result.status === 'error'
+                          ? 'bg-red-900/20 border-red-700/50'
+                          : result.status === 'testing'
+                          ? 'bg-blue-900/20 border-blue-700/50'
+                          : 'bg-dark-800/50 border-dark-700/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-dark-300 truncate flex-1">{displayName}</span>
+                        <span
+                          className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            result.status === 'success'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : result.status === 'error'
+                              ? 'bg-red-500/20 text-red-400'
+                              : result.status === 'testing'
+                              ? 'bg-blue-500/20 text-blue-400'
+                              : 'bg-dark-700 text-dark-500'
+                          }`}
+                        >
+                          {result.status === 'success' ? '✓ Success' : result.status === 'error' ? '✗ Error' : result.status === 'testing' ? 'Testing...' : 'Pending'}
+                        </span>
+                      </div>
+                      {result.status === 'success' && result.response && (
+                        <p className="text-dark-400 mt-1 truncate" title={result.response}>
+                          {result.response}
+                        </p>
+                      )}
+                      {result.status === 'error' && result.message && (
+                        <p className="text-red-400 mt-1 text-[10px] truncate" title={result.message}>
+                          {result.message}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

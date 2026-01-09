@@ -50,6 +50,83 @@ async function handleMessage(message: ChromeMessage): Promise<unknown> {
       }
     }
 
+    case 'VIDEO_REQUEST': {
+      // Handle video generation requests (e.g., Google Veo) to avoid CORS issues
+      const payload = message.payload as {
+        url: string;
+        method: string;
+        headers: Record<string, string>;
+        body: string;
+      };
+
+      console.log('[Background] Video request received:', payload.url);
+
+      try {
+        const response = await fetch(payload.url, {
+          method: payload.method || 'POST',
+          headers: payload.headers || {},
+          body: payload.body || undefined,
+        });
+
+        const responseText = await response.text();
+        
+        return {
+          success: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: responseText,
+        };
+      } catch (error) {
+        console.error('[Background] Video request error:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
+    case 'GENERATE_VIDEO_VEO': {
+      // Handle Google Veo video generation requests to avoid CORS issues
+      const payload = message.payload as {
+        apiUrl: string;
+        requestBody: any;
+        headers: Record<string, string>;
+      };
+
+      console.log('[Background] GENERATE_VIDEO_VEO request received:', payload.apiUrl);
+      console.log('[Background] Request body:', JSON.stringify(payload.requestBody, null, 2));
+
+      try {
+        const response = await fetch(payload.apiUrl, {
+          method: 'POST',
+          headers: payload.headers || {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload.requestBody),
+        });
+
+        const responseText = await response.text();
+        
+        console.log('[Background] Veo API response status:', response.status);
+        console.log('[Background] Veo API response body:', responseText.substring(0, 500));
+
+        return {
+          success: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: responseText,
+        };
+      } catch (error) {
+        console.error('[Background] GENERATE_VIDEO_VEO error:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
     default:
       return { success: false, error: 'Unknown message type' };
     }

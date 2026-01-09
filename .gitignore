@@ -22,6 +22,7 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+# Note: .env.example is intentionally tracked (contains only placeholder values)
 
 # TypeScript
 *.tsbuildinfo
