@@ -74,7 +74,7 @@
 - **状态管理**: React Hooks
 - **存储方案**: LocalStorage（Web 环境）
 - **API 集成**: 
-  - POE API（AI 模型）
+  - 6个AI模型供应商（OpenAI, Google Gemini, Grok/xAI, 通义千问, 豆包, Perplexity）
   - XOOBAY API（产品信息）
   - WordPress REST API（内容同步）
 
@@ -373,9 +373,13 @@ VITE_INTERNAL_SESSION_TOKEN=your_session_token
 
 1. **配置 API Key**
    - 点击右上角 ⚙️ 设置图标
-   - 输入 POE API Key（或其他支持的 API Key）
-   - 设置 Base URL（默认: `https://api.poe.com/v1`）
-   - 选择默认 AI 模型
+   - 选择 **API 模式**：
+     - **Internal Mode（推荐）**：通过环境变量配置6个供应商的 API Key（详见[配置说明](#-配置说明)）
+     - **DIY Mode（自定义）**：手动配置 Base URL 和 API Key
+   - **DIY Mode 默认配置**：
+     - Base URL: `https://api.openai.com/v1`
+     - 默认模型: `gpt-5.2`
+   - 选择默认 AI 模型（支持6个供应商的模型）
 
 2. **配置 WordPress（可选）**
    - 在设置中输入 WordPress API URL
@@ -466,6 +470,9 @@ VITE_INTERNAL_SESSION_TOKEN=your_session_token
 
 - **模式**: DIY Mode (Custom)
 - **需要手动配置**: Base URL 和 API Key
+- **默认配置**:
+  - Base URL: `https://api.openai.com/v1` (OpenAI)
+  - 默认模型: `gpt-5.2`
 - **适用场景**: 使用自定义 API 服务或代理
 
 ### 模型测试
