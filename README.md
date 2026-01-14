@@ -94,7 +94,7 @@
    git clone https://github.com/jhx666oo/AI-SEO.git
    cd AI-SEO
    ```
-   
+
    > **注意**: 
    > - 克隆后会自动创建 `AI-SEO` 目录（与 GitHub 仓库名相同）
    > - 如果您本地已经有项目代码（无论目录名是什么），可以直接进入项目根目录，跳过克隆步骤
@@ -324,14 +324,39 @@
    docker run -d -p 80:80 ai-seo
    ```
 
-### 环境变量配置（可选）
+### 环境变量配置
 
-如需在生产环境配置默认值，可以在部署时设置环境变量：
+#### Internal Mode 环境变量
 
-- `VITE_DEFAULT_API_URL`: 默认 API Base URL
-- `VITE_DEFAULT_MODEL`: 默认 AI 模型
+在 Internal Mode 下，需要通过环境变量配置各供应商的 API Key：
 
-**注意**: 本项目主要使用浏览器 LocalStorage 存储配置，环境变量仅用于设置默认值。
+**开发环境**（`.env` 文件）：
+```bash
+VITE_DOUBAO_API_KEY=your_doubao_api_key
+VITE_QWEN_API_KEY=your_qwen_api_key
+VITE_OPENAI_API_KEY=your_openai_api_key
+VITE_GROK_API_KEY=your_grok_api_key
+VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_PERPLEXITY_API_KEY=your_perplexity_api_key
+```
+
+**生产环境**（推荐使用代理服务）：
+```bash
+# 如果使用代理服务（推荐）
+VITE_PROXY_BASE_URL=https://api.yourcompany.com/v1/ai-proxy
+VITE_INTERNAL_SESSION_TOKEN=your_session_token
+
+# 如果未配置代理（会回退到直连，有跨域风险）
+# 系统会自动使用各供应商的官方 API 地址
+```
+
+**架构说明**：
+- **开发环境**：直连各供应商官方 API（使用环境变量中的 API Key）
+- **生产环境**：
+  - 如果配置了 `VITE_PROXY_BASE_URL`，统一走代理服务（安全，推荐）
+  - 如果未配置 `VITE_PROXY_BASE_URL`，回退到各供应商官方地址（紧急测试用，有跨域风险）
+
+详细配置方法请参考 [API Key 管理文档](./docs/INTERNAL_MODE_API_KEY_MANAGEMENT.md)
 
 ### 跨域配置（CORS）
 
@@ -465,7 +490,7 @@
 
 - **OpenAI**: 自动转换为小写（GPT-4o → gpt-4o）
 - **Perplexity**: 自动转换为小写加连字符（Sonar Pro → sonar-pro）
-- **Gemini**: 自动转换为小写格式
+- **Gemini**: 自动转换为小写格式，支持多种输入格式（Gemini-3-Pro-Preview → gemini-3-pro-preview）
 - **豆包**: 使用 Endpoint ID (ep-xxx)，不进行转换
 - **通义千问**: qwen3-max 自动映射为 qwen-max
 
@@ -523,22 +548,27 @@
 
 #### 视频生成模型 (官方列表)
 
-- **OpenAI**: 
+本项目支持以下 6 个供应商的视频生成模型：
+
+- **OpenAI (GPT)**: 
   - sora-2 (支持图片参考，最大 20 秒)
   - sora-2-pro (支持图片参考和音频，最大 60 秒)
-- **Google Veo**: 
+- **Google Gemini**: 
   - veo-3.1-generate-preview (支持音频，1920x1080)
   - veo-3.1-fast-generate-preview (快速预览，1280x720)
   - veo-3.0-generate-001 (稳定版，支持音频)
   - veo-3.0-fast-generate-001 (快速版本)
-- **通义千问**: 
+- **通义千问 (Qwen)**: 
   - wan2.6-t2v (Text-to-Video)
   - wan2.5-t2v-preview (预览版)
   - wan2.2-t2v-plus (增强版)
-- **豆包**: 
+- **豆包 (Doubao)**: 
   - doubao-seedance-1-5-pro-251215 (支持音频，1920x1080，最大 15 秒)
 
-> **注意**: 所有模型名称已更新为官方 API ID，支持自动大小写转换和格式规范化。
+> **注意**: 
+> - 所有模型名称已更新为官方 API ID，支持自动大小写转换和格式规范化
+> - Grok 和 Perplexity 目前不提供视频生成模型
+> - 视频模型列表已更新，仅包含当前支持的 6 个供应商的模型
 
 ## 📁 项目结构
 
@@ -547,8 +577,8 @@
 ├── public/                 # 静态资源
 │   └── icons/             # 图标文件
 ├── docs/                   # 文档目录
-│   ├── IMPLEMENTATION_GUIDE.md           # 实施指南
-│   └── INTERNAL_MODE_API_KEY_MANAGEMENT.md  # API Key 管理文档
+│   ├── INTERNAL_MODE_API_KEY_MANAGEMENT.md  # API Key 管理文档
+│   └── DEPLOYMENT_CHECKLIST.md              # 上线前检查清单
 ├── src/
 │   ├── background/        # Chrome Extension Background Script
 │   │   └── index.ts       # 处理视频生成请求（绕过 CORS）

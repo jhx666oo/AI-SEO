@@ -23,36 +23,40 @@ interface VideoResponse {
 
 // Commercialization logic settings (Hybrid Mode: Dev + Production)
 // 开发环境：直连各供应商（使用环境变量）
-// 生产环境：统一走代理服务（安全）
+// 生产环境：如果有 VITE_PROXY_BASE_URL，统一走代理服务（安全）
+//          如果 VITE_PROXY_BASE_URL 为空，回退到各供应商官方地址（紧急测试用，有跨域风险）
 
 const isProduction = import.meta.env.MODE === 'production';
-const proxyBaseUrl = import.meta.env.VITE_PROXY_BASE_URL || 'https://api.yourcompany.com/v1/ai-proxy';
+const proxyBaseUrl = import.meta.env.VITE_PROXY_BASE_URL || '';
 const sessionToken = import.meta.env.VITE_INTERNAL_SESSION_TOKEN || 'internal-session-token';
+
+// Determine if we should use proxy (only when production AND proxyBaseUrl is provided)
+const useProxy = isProduction && proxyBaseUrl;
 
 const INTERNAL_API_CONFIG: Record<string, { baseUrl: string; apiKey: string }> = {
   doubao: {
-    baseUrl: isProduction ? proxyBaseUrl : 'https://ark.cn-beijing.volces.com/api/v3',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_DOUBAO_API_KEY || ''),
+    baseUrl: useProxy ? proxyBaseUrl : 'https://ark.cn-beijing.volces.com/api/v3',
+    apiKey: useProxy ? sessionToken : (import.meta.env.VITE_DOUBAO_API_KEY || ''),
   },
   qwen: {
-    baseUrl: isProduction ? proxyBaseUrl : 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_QWEN_API_KEY || ''),
+    baseUrl: useProxy ? proxyBaseUrl : 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    apiKey: useProxy ? sessionToken : (import.meta.env.VITE_QWEN_API_KEY || ''),
   },
   gpt: {
-    baseUrl: isProduction ? proxyBaseUrl : 'https://api.openai.com/v1',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_OPENAI_API_KEY || ''),
+    baseUrl: useProxy ? proxyBaseUrl : 'https://api.openai.com/v1',
+    apiKey: useProxy ? sessionToken : (import.meta.env.VITE_OPENAI_API_KEY || ''),
   },
   grok: {
-    baseUrl: isProduction ? proxyBaseUrl : 'https://api.x.ai/v1',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_GROK_API_KEY || ''),
+    baseUrl: useProxy ? proxyBaseUrl : 'https://api.x.ai/v1',
+    apiKey: useProxy ? sessionToken : (import.meta.env.VITE_GROK_API_KEY || ''),
   },
   gemini: {
-    baseUrl: isProduction ? proxyBaseUrl : 'https://generativelanguage.googleapis.com/v1beta/openai',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_GEMINI_API_KEY || ''),
+    baseUrl: useProxy ? proxyBaseUrl : 'https://generativelanguage.googleapis.com/v1beta/openai',
+    apiKey: useProxy ? sessionToken : (import.meta.env.VITE_GEMINI_API_KEY || ''),
   },
   perplexity: {
-    baseUrl: isProduction ? proxyBaseUrl : 'https://api.perplexity.ai',
-    apiKey: isProduction ? sessionToken : (import.meta.env.VITE_PERPLEXITY_API_KEY || ''),
+    baseUrl: useProxy ? proxyBaseUrl : 'https://api.perplexity.ai',
+    apiKey: useProxy ? sessionToken : (import.meta.env.VITE_PERPLEXITY_API_KEY || ''),
   },
 };
 
@@ -218,9 +222,31 @@ export async function sendToAI(
       return normalized;
     }
     
-    // Gemini: Already handled separately below, but ensure lowercase
+    // Gemini: Map to official API model IDs and ensure lowercase
     if (provider === 'gemini') {
-      return original.toLowerCase();
+      const geminiMap: Record<string, string> = {
+        'gemini-3-pro-preview': 'gemini-3-pro-preview',
+        'Gemini-3-Pro-Preview': 'gemini-3-pro-preview',
+        'GEMINI-3-PRO-PREVIEW': 'gemini-3-pro-preview',
+        'gemini-3-flash-preview': 'gemini-3-flash-preview',
+        'Gemini-3-Flash-Preview': 'gemini-3-flash-preview',
+        'GEMINI-3-FLASH-PREVIEW': 'gemini-3-flash-preview',
+        'gemini-2.5-pro': 'gemini-2.5-pro',
+        'Gemini-2.5-Pro': 'gemini-2.5-pro',
+        'GEMINI-2.5-PRO': 'gemini-2.5-pro',
+        'gemini-2.5-flash': 'gemini-2.5-flash',
+        'Gemini-2.5-Flash': 'gemini-2.5-flash',
+        'GEMINI-2.5-FLASH': 'gemini-2.5-flash',
+        'gemini-2.5-flash-lite': 'gemini-2.5-flash-lite',
+        'Gemini-2.5-Flash-Lite': 'gemini-2.5-flash-lite',
+        'GEMINI-2.5-FLASH-LITE': 'gemini-2.5-flash-lite',
+        'gemini-2.0-flash': 'gemini-2.0-flash',
+        'Gemini-2.0-Flash': 'gemini-2.0-flash',
+        'GEMINI-2.0-FLASH': 'gemini-2.0-flash',
+      };
+      const normalized = geminiMap[original] || geminiMap[original.toLowerCase()] || original.toLowerCase();
+      console.log('[AI Service] Gemini model normalized:', original, '->', normalized);
+      return normalized;
     }
     
     // Default: Convert to lowercase for other providers
@@ -345,12 +371,12 @@ export async function sendToAI(
     console.log('[AI Service] Final Gemini model name:', requestBody.model);
   }
 
-  // Production mode: add provider info for proxy routing
-  if (isProduction && isInternal) {
+  // Proxy mode: add provider info for proxy routing
+  if (useProxy && isInternal) {
     requestBody.provider = provider;
   }
 
-  const isGeminiDirect = provider === 'gemini' && !isProduction;
+  const isGeminiDirect = provider === 'gemini' && !useProxy;
   let apiUrl = `${baseUrl}/chat/completions`;
   const cleanKey = apiKey ? apiKey.trim().replace(/^["']|["']$/g, '') : '';
 
@@ -586,7 +612,7 @@ export async function generateVideoPrompt(
 
   try {
     const cleanKey = apiKey ? apiKey.trim().replace(/^["']|["']$/g, '') : '';
-    const isGeminiDirect = settings.provider === 'gemini' && !isProduction;
+    const isGeminiDirect = settings.provider === 'gemini' && !useProxy;
     let textApiUrl = `${baseUrl}/chat/completions`;
 
     // Add key parameter for Gemini in development mode
@@ -831,7 +857,7 @@ export async function createVideoTask(
       actualVideoModel.toLowerCase().includes('veo') ||
       actualVideoModel.toLowerCase().includes('generate')
     );
-    const isGeminiDirect = settings.provider === 'gemini' && !isProduction;
+    const isGeminiDirect = settings.provider === 'gemini' && !useProxy;
 
     // Handle Google Veo native API endpoint (Protocol Branch)
     if (isGeminiVeo) {

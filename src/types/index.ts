@@ -18,9 +18,9 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
   baseUrl: 'https://api.openai.com/v1',
-  model: 'Doubao-pro-128k',
-  apiMode: 'internal',
-  provider: 'doubao',
+  model: 'gpt-5.2',
+  apiMode: 'custom',
+  provider: 'gpt',
   companyName: '',
   brandName: '',
   wordpressApiUrl: '',
@@ -68,12 +68,6 @@ export type VideoModel =
   | 'Sora-Pro'
   | 'Veo-2'
   | 'Veo-3'
-  | 'Runway-Gen3'
-  | 'Kling-Video'
-  | 'Kling-1.5'
-  | 'Hailuo-Video'
-  | 'Pika-Video'
-  | 'Luma-Dream-Machine'
   // Custom video model (user can create their own)
   | string;
 
@@ -105,7 +99,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: false,
     description: 'OpenAI Sora 2 video generation model',
-    provider: 'OpenAI',
+    provider: 'gpt',
   },
   {
     name: 'sora-2-pro',
@@ -118,7 +112,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: true,
     description: 'OpenAI Sora 2 Pro - enhanced quality and longer videos',
-    provider: 'OpenAI',
+    provider: 'gpt',
   },
   // Google Veo
   {
@@ -132,7 +126,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: true,
     description: 'Google Veo 3.1 - latest preview version with audio support',
-    provider: 'Google',
+    provider: 'gemini',
   },
   {
     name: 'veo-3.1-fast-generate-preview',
@@ -145,7 +139,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: false,
     description: 'Google Veo 3.1 Fast - faster generation for quick previews',
-    provider: 'Google',
+    provider: 'gemini',
   },
   {
     name: 'veo-3.0-generate-001',
@@ -158,7 +152,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: true,
     description: 'Google Veo 3.0 stable version',
-    provider: 'Google',
+    provider: 'gemini',
   },
   {
     name: 'veo-3.0-fast-generate-001',
@@ -171,7 +165,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: false,
     description: 'Google Veo 3.0 Fast - faster generation',
-    provider: 'Google',
+    provider: 'gemini',
   },
   // Doubao Video
   {
@@ -185,7 +179,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: true,
     description: 'Doubao Seedance 1.5 Pro video generation',
-    provider: 'Doubao',
+    provider: 'doubao',
   },
   // Qwen Video
   {
@@ -199,7 +193,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: false,
     description: 'Qwen Wan 2.6 Text-to-Video',
-    provider: 'Qwen',
+    provider: 'qwen',
   },
   {
     name: 'wan2.5-t2v-preview',
@@ -212,7 +206,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: false,
     description: 'Qwen Wan 2.5 Text-to-Video Preview',
-    provider: 'Qwen',
+    provider: 'qwen',
   },
   {
     name: 'wan2.2-t2v-plus',
@@ -225,90 +219,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: false,
     description: 'Qwen Wan 2.2 Text-to-Video Plus',
-    provider: 'Qwen',
-  },
-  // Runway
-  {
-    name: 'Runway-Gen3',
-    displayName: 'Runway Gen-3 Alpha',
-    maxDuration: 10,
-    minDuration: 4,
-    durationStep: 1,
-    defaultWidth: 1280,
-    defaultHeight: 768,
-    supportsImageReference: true,
-    supportsSoundGeneration: false,
-    description: 'Runway Gen-3 Alpha video model',
-    provider: 'Runway',
-  },
-  // Kuaishou Kling
-  {
-    name: 'Kling-Video',
-    displayName: 'Kling Video',
-    maxDuration: 10,
-    minDuration: 5,
-    durationStep: 1,
-    defaultWidth: 1920,
-    defaultHeight: 1080,
-    supportsImageReference: true,
-    supportsSoundGeneration: false,
-    description: 'Kuaishou Kling video model',
-    provider: 'Kuaishou',
-  },
-  {
-    name: 'Kling-1.5',
-    displayName: 'Kling 1.5',
-    maxDuration: 10,
-    minDuration: 5,
-    durationStep: 1,
-    defaultWidth: 1920,
-    defaultHeight: 1080,
-    supportsImageReference: true,
-    supportsSoundGeneration: false,
-    description: 'Kuaishou Kling 1.5 enhanced model',
-    provider: 'Kuaishou',
-  },
-  // MiniMax Hailuo
-  {
-    name: 'Hailuo-Video',
-    displayName: 'Hailuo Video',
-    maxDuration: 6,
-    minDuration: 4,
-    durationStep: 1,
-    defaultWidth: 1280,
-    defaultHeight: 720,
-    supportsImageReference: true,
-    supportsSoundGeneration: false,
-    description: 'MiniMax Hailuo video model',
-    provider: 'MiniMax',
-  },
-  // Pika Labs
-  {
-    name: 'Pika-Video',
-    displayName: 'Pika Video',
-    maxDuration: 4,
-    minDuration: 3,
-    durationStep: 1,
-    defaultWidth: 1024,
-    defaultHeight: 576,
-    supportsImageReference: true,
-    supportsSoundGeneration: false,
-    description: 'Pika Labs video generation',
-    provider: 'Pika',
-  },
-  // Luma AI
-  {
-    name: 'Luma-Dream-Machine',
-    displayName: 'Luma Dream Machine',
-    maxDuration: 5,
-    minDuration: 4,
-    durationStep: 1,
-    defaultWidth: 1360,
-    defaultHeight: 752,
-    supportsImageReference: true,
-    supportsSoundGeneration: false,
-    description: 'Luma AI Dream Machine',
-    provider: 'Luma',
+    provider: 'qwen',
   },
 ];
 
