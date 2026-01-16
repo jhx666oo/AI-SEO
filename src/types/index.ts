@@ -9,6 +9,10 @@ export interface Settings {
   provider: 'gpt' | 'gemini' | 'grok' | 'doubao' | 'qwen' | 'perplexity';
   companyName: string;
   brandName: string;
+  theme: 'light' | 'dark';
+  isEnterprise: boolean;
+  usageLimit: number;
+  usageCount: number;
   wordpressApiUrl?: string;
   wordpressApiKey?: string;
   wordpressUsername?: string;
@@ -23,6 +27,10 @@ export const DEFAULT_SETTINGS: Settings = {
   provider: 'gpt',
   companyName: '',
   brandName: '',
+  theme: 'light',
+  isEnterprise: false,
+  usageLimit: 100,
+  usageCount: 0,
   wordpressApiUrl: '',
   wordpressApiKey: '',
   wordpressUsername: '',

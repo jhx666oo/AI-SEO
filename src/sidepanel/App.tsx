@@ -1,525 +1,248 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useSettings } from '@/hooks/useSettings';
-import { useAI } from '@/hooks/useAI';
-import { useSession } from '@/hooks/useSession';
-import { useXoobay } from '@/hooks/useXoobay';
-import { PageContent, ImageInfo, AIConfig, DEFAULT_AI_CONFIG, VideoConfig, DEFAULT_VIDEO_CONFIG, VideoModel, XoobayLanguage, PROVIDER_MODELS, AVAILABLE_MODELS, VIDEO_MODELS, Settings } from '@/types';
-import { buildSystemPrompt, OUTPUT_LANGUAGES, OUTPUT_FORMATS, REASONING_LEVELS, buildVideoSystemPrompt, VIDEO_OUTPUT_LANGUAGES, VIDEO_STYLES } from '@/utils/templates';
-import { sendToAI } from '@/services/ai';
+import React, { useState, useEffect } from "react";
+import {
+  Zap,
+  Search,
+  FileText,
+  Sparkles,
+  BarChart3,
+  Languages,
+  Layout,
+  Settings as SettingsIcon,
+  User as UserIcon,
+  Copy,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  ChevronRight,
+  ChevronLeft,
+  ShieldCheck,
+  History,
+  LogOut,
+  Mail,
+  Server,
+  Key as KeyIcon,
+  Package,
+  X,
+  Type,
+  ChevronDown,
+  ChevronUp,
+  Activity,
+  DownloadCloud,
+  Film
+} from "lucide-react";
 
-type Step = 'read' | 'edit' | 'config' | 'result';
-type ResultView = 'rendered' | 'raw';
-type ConfigMode = 'text' | 'video';
-type SidePanel = 'sessions' | 'media' | null;
+// --- 导入真实项目逻辑 ---
+import { useSettings } from "@/hooks/useSettings";
+import { useAI } from "@/hooks/useAI";
+import { useSession } from "@/hooks/useSession";
+import { useXoobay } from "@/hooks/useXoobay";
+import {
+  PageContent,
+  ImageInfo,
+  AIConfig,
+  DEFAULT_AI_CONFIG,
+  PROVIDER_MODELS,
+  XoobayLanguage,
+  VideoConfig,
+  DEFAULT_VIDEO_CONFIG,
+  VIDEO_MODELS
+} from "@/types";
+import {
+  OUTPUT_LANGUAGES,
+  OUTPUT_FORMATS,
+  buildSystemPrompt,
+  VIDEO_STYLES,
+  VIDEO_OUTPUT_LANGUAGES,
+  buildVideoSystemPrompt
+} from "@/utils/templates";
+import { sendToAI } from "@/services/ai";
+
+/**
+ * 国际化词典 - UI 静态文本
+ */
+const locales = {
+  zh: {
+    title: "AI SEO 平台",
+    enterprise: "企业增强版",
+    quota: "账户余额",
+    upgrade: "充值/升级",
+    steps: ["智能选品", "内容校对", "策略配置", "生成结果"],
+    generating: "AI 引擎正在深度创作...",
+    engine_status: "企业智选引擎 (SaaS 托管)",
+    diy_status: "自定义 DIY 模式 (私有密钥)",
+    btn_next: "下一步",
+    btn_prev: "上一步",
+    btn_generate: "开始生成",
+    btn_restart: "重新开始",
+    system_config: "系统配置",
+    pricing_plans: "选择升级方案",
+    page_jump: "跳转",
+    status_active: "在线",
+    status_offline: "离线",
+    searchPlaceholder: "输入产品名称或关键词...",
+    loadProduct: "读取产品详情",
+    noProducts: "暂无产品，请尝试搜索",
+    editTitle: "原始数据校对",
+    editTabContent: "文本内容",
+    editTabImages: "媒体资源",
+    confirmContent: "确认进入下一步",
+    configTitle: "生成策略配置",
+    targetLanguage: "目标语言",
+    outputFormat: "输出格式",
+    advancedMode: "高级创作参数",
+    webSearch: "联网实时增强 (RAG)",
+    reasoningEffort: "逻辑推理强度",
+    low: "标准 (快)",
+    medium: "增强 (准)",
+    high: "深度 (极)",
+    copy: "复制内容",
+    download: "导出文档",
+    modelTesting: "模型连通性测试",
+    runTest: "立即扫描",
+    testSuccess: "测试成功",
+    testError: "测试失败",
+    testTesting: "正在扫描...",
+    activeStatus: "可用",
+    offlineStatus: "不可用",
+    testingStatus: "检测中",
+    saveSettings: "保存配置并返回",
+    enterpriseMode: "企业托管",
+    diyMode: "自定义 DIY"
+  },
+  en: {
+    title: "AI SEO Platform",
+    enterprise: "Enterprise",
+    quota: "Credits",
+    upgrade: "Upgrade",
+    steps: ["Product", "Review", "Config", "Result"],
+    generating: "AI is writing...",
+    engine_status: "Smart Engine (SaaS)",
+    diy_status: "DIY Mode (Private Key)",
+    btn_next: "Next",
+    btn_prev: "Back",
+    btn_generate: "Generate Now",
+    btn_restart: "Restart",
+    system_config: "System Config",
+    pricing_plans: "Upgrade Plans",
+    page_jump: "Go",
+    status_active: "Active",
+    status_offline: "Offline",
+    searchPlaceholder: "Search products...",
+    loadProduct: "Load Details",
+    noProducts: "No products found",
+    editTitle: "Data Verification",
+    editTabContent: "Content",
+    editTabImages: "Images",
+    confirmContent: "Confirm & Next",
+    configTitle: "Generation Strategy",
+    targetLanguage: "Output Language",
+    outputFormat: "Output Format",
+    advancedMode: "Advanced Params",
+    webSearch: "Web Search (RAG)",
+    reasoningEffort: "Reasoning Effort",
+    low: "Standard",
+    medium: "Medium",
+    high: "Deep",
+    copy: "Copy",
+    download: "Export",
+    modelTesting: "Model Connectivity",
+    runTest: "Scan Now",
+    testSuccess: "Success",
+    testError: "Error",
+    testTesting: "Scanning...",
+    activeStatus: "Active",
+    offlineStatus: "Offline",
+    testingStatus: "Testing",
+    saveSettings: "Save & Close",
+    enterpriseMode: "Enterprise",
+    diyMode: "DIY Mode"
+  }
+};
 
 const PROVIDERS_LIST = [
-  { id: 'doubao', name: 'Doubao', company: '字节跳动', icon: '🍃', color: 'bg-emerald-500', desc: '高效全能' },
-  { id: 'qwen', name: 'Qwen', company: '通义千问', icon: '☁️', color: 'bg-indigo-500', desc: '逻辑严密' },
-  { id: 'gpt', name: 'OpenAI', company: 'ChatGPT', icon: '🤖', color: 'bg-emerald-600', desc: '行业标杆' },
-  { id: 'gemini', name: 'Google', company: 'Gemini', icon: '✨', color: 'bg-blue-500', desc: '多模态强' },
-  { id: 'grok', name: 'xAI', company: 'Grok', icon: '🌌', color: 'bg-purple-600', desc: '实时互联' },
-  { id: 'perplexity', name: 'Perplexity', company: 'Search', icon: '🔍', color: 'bg-cyan-500', desc: '百科全书' },
+  { id: "doubao", name: "Doubao", icon: "💎", color: "bg-blue-500" },
+  { id: "gpt", name: "ChatGPT", icon: "⭐", color: "bg-emerald-500" },
+  { id: "anthropic", name: "Claude", icon: "🎨", color: "bg-orange-500" },
+  { id: "gemini", name: "Gemini", icon: "✨", color: "bg-blue-400" },
+  { id: "qwen", name: "Qwen", icon: "⛩️", color: "bg-purple-500" },
+  { id: "perplexity", name: "Perplexity", icon: "🔮", color: "bg-teal-500" }
 ];
 
 export const App: React.FC = () => {
+  // --- 1. 核心业务 Hooks ---
   const { settings, updateSettings, loading: settingsLoading } = useSettings();
-  const { sendPrompt, sendVideoRequest, loading: aiLoading, error: aiError, result: aiResult, videoResult, videoPolling, clearResult, stopPolling } = useAI();
-  const { 
-    loading: xoobayLoading, 
-    error: xoobayError, 
-    products: xoobayProducts, 
-    currentPage: xoobayPage, 
+  const { sendPrompt, sendVideoRequest, loading: aiLoading, error: aiError, result: aiResult, videoResult, videoPolling, clearResult } = useAI();
+  const {
+    loading: xoobayLoading,
+    products: xoobayProducts,
+    currentPage: xoobayPage,
     totalPages: xoobayTotalPages,
     searchProducts,
     loadProductAsPageContent,
   } = useXoobay();
-  
-  // Session management
-  const {
-    sessions,
-    activeSession,
-    activeSessionId,
-    isLoading: sessionLoading,
-    createSession,
-    switchSession,
-    deleteSession,
-    renameSession,
-    mediaLibrary,
-    addMediaItem,
-    removeMediaItem,
-    renameMediaItem,
-    clearMediaLibrary,
-    aiConfig: sessionAiConfig,
-    updateAIConfig: updateSessionAIConfig,
-    videoConfig: sessionVideoConfig,
-    updateVideoConfig: updateSessionVideoConfig,
-    updatePageContent: updateSessionPageContent,
-  } = useSession();
+  const { updatePageContent: updateSessionPageContent } = useSession();
 
-  const [step, setStep] = useState<Step>('read');
-  const [pageContent, setPageContent] = useState<PageContent | null>(null);
-  const [editedContent, setEditedContent] = useState('');
-  const [selectedImages, setSelectedImages] = useState<ImageInfo[]>([]);
-  const [showSettings, setShowSettings] = useState(false);
-  const [resultView, setResultView] = useState<ResultView>('rendered');
-  const [editTab, setEditTab] = useState<'text' | 'images'>('text');
-  
-  // XOOBAY related state
-  const [xoobaySearchTerm, setXoobaySearchTerm] = useState('');
-  const [xoobayLang, setXoobayLang] = useState<XoobayLanguage>('zh_cn');
+  // --- 2. UI 状态管理 ---
+  const [lang, setLang] = useState<"zh" | "en">("zh");
+  const [step, setStep] = useState(1);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [modal, setModal] = useState<"upgrade" | "settings" | "account" | null>(null);
+
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  
-  // Side panel state
-  const [sidePanel, setSidePanel] = useState<SidePanel>(null);
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editingSessionName, setEditingSessionName] = useState('');
-  const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
-  const [editingMediaName, setEditingMediaName] = useState('');
+  const [editedContent, setEditedContent] = useState("");
+  const [pageContent, setPageContent] = useState<PageContent | null>(null);
+  const [editTab, setEditTab] = useState<"text" | "images">("text");
+  const [selectedImages, setSelectedImages] = useState<ImageInfo[]>([]);
 
-  // Model testing state
-  const [testingModels, setTestingModels] = useState<boolean>(false);
-  const [testResults, setTestResults] = useState<Record<string, { status: 'pending' | 'testing' | 'success' | 'error'; message?: string; response?: string }>>({});
-  
-  // Config mode: text generation vs video generation
-  const [configMode, setConfigMode] = useState<ConfigMode>('text');
-  
-  // AI Config State (for text generation) - synced with session
-  const [aiConfig, setAiConfig] = useState<AIConfig>({
-    ...DEFAULT_AI_CONFIG,
-    systemPrompt: buildSystemPrompt('auto', 'markdown', 'medium', false, settings?.brandName, settings?.companyName),
-  });
-  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
-  
-  // Video Config State - synced with session
+  const [searchTerm, setSearchTerm] = useState("");
+  const [jumpInputValue, setJumpInputValue] = useState("");
+
+  // --- 视频生成状态 ---
+  const [generationMode, setGenerationMode] = useState<"text" | "video">("text");
   const [videoConfig, setVideoConfig] = useState<VideoConfig>(DEFAULT_VIDEO_CONFIG);
-  
-  // Sync local config with session config ONLY when session ID changes (not on every config update)
-  useEffect(() => {
-    if (activeSession && activeSessionId) {
-      setAiConfig(sessionAiConfig);
-      setVideoConfig(sessionVideoConfig);
-      if (activeSession.pageContent) {
-        setPageContent(activeSession.pageContent);
-        setEditedContent(activeSession.pageContent.text);
+
+  const [aiConfig, setAiConfig] = useState<AIConfig>(DEFAULT_AI_CONFIG);
+  const [testingModels, setTestingModels] = useState(false);
+  const [testResults, setTestResults] = useState<Record<string, { status: string; message?: string }>>({});
+
+  const t = locales[lang];
+
+  // --- 3. Content Renderers (Professional) ---
+  const renderInlineMarkdown = (text: string): React.ReactNode => {
+    const parts: React.ReactNode[] = [];
+    let remaining = text;
+    let key = 0;
+
+    while (remaining.length > 0) {
+      const boldMatch = remaining.match(/^(.*?)(\*\*|__)(.+?)\2(.*)$/s);
+      if (boldMatch) {
+        if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>);
+        parts.push(<strong key={key++} className="font-bold text-slate-900">{boldMatch[3]}</strong>);
+        remaining = boldMatch[4];
+        continue;
       }
-    }
-    // Only depend on activeSessionId - not on config objects to avoid resetting editedContent
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId]);
-  
-  // Update session config when local config changes (debounced to avoid loops)
-  const configUpdateTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  useEffect(() => {
-    if (activeSession && !sessionLoading) {
-      // Debounce config updates to avoid too many writes
-      if (configUpdateTimeoutRef.current) {
-        clearTimeout(configUpdateTimeoutRef.current);
+      const codeMatch = remaining.match(/^(.*?)`([^`]+)`(.*)$/s);
+      if (codeMatch) {
+        if (codeMatch[1]) parts.push(<span key={key++}>{codeMatch[1]}</span>);
+        parts.push(<code key={key++} className="px-1.5 py-0.5 bg-slate-100 text-blue-700 rounded text-sm font-mono">{codeMatch[2]}</code>);
+        remaining = codeMatch[3];
+        continue;
       }
-      configUpdateTimeoutRef.current = setTimeout(() => {
-        updateSessionAIConfig(aiConfig);
-      }, 500);
+      parts.push(<span key={key++}>{remaining}</span>);
+      break;
     }
-    return () => {
-      if (configUpdateTimeoutRef.current) {
-        clearTimeout(configUpdateTimeoutRef.current);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiConfig]);
-  
-  useEffect(() => {
-    if (activeSession && !sessionLoading) {
-      updateSessionVideoConfig(videoConfig);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoConfig]);
-
-  // Build final system prompt when config changes (for text mode)
-  const finalSystemPrompt = useMemo(() => {
-    return buildSystemPrompt(
-      aiConfig.outputLanguage,
-      aiConfig.outputFormat,
-      aiConfig.reasoningEffort,
-      aiConfig.enableWebSearch,
-      settings.brandName,
-      settings.companyName
-    );
-  }, [aiConfig.outputLanguage, aiConfig.outputFormat, aiConfig.reasoningEffort, aiConfig.enableWebSearch, settings.brandName, settings.companyName]);
-
-  // Update aiConfig.systemPrompt when finalSystemPrompt changes
-  useEffect(() => {
-    setAiConfig(c => ({ ...c, systemPrompt: finalSystemPrompt }));
-  }, [finalSystemPrompt]);
-  
-  // Get current video model config
-  const currentVideoModel = useMemo(() => {
-    return VIDEO_MODELS.find(m => m.name === videoConfig.model) || VIDEO_MODELS[0];
-  }, [videoConfig.model]);
-  
-  // Calculate aspect ratio string from width/height
-  const getAspectRatio = (w: number, h: number): string => {
-    if (w === h) return '1:1';
-    if (w > h) return `${Math.round(w / h * 9)}:9`;
-    return `9:${Math.round(h / w * 9)}`;
-  };
-  
-  // Build video system prompt when video config changes
-  const finalVideoSystemPrompt = useMemo(() => {
-    const aspectRatio = getAspectRatio(videoConfig.width, videoConfig.height);
-    return buildVideoSystemPrompt({
-      modelName: currentVideoModel.displayName,
-      minDuration: currentVideoModel.minDuration,
-      maxDuration: currentVideoModel.maxDuration,
-      aspectRatio: aspectRatio,
-      brandName: videoConfig.brandName,
-      brandUrl: videoConfig.brandUrl,
-      targetLanguage: videoConfig.targetLanguage,
-      videoStyle: videoConfig.videoStyle,
-      enableSound: videoConfig.enableSound && currentVideoModel.supportsSoundGeneration,
-      useImageReference: videoConfig.useImageReference && currentVideoModel.supportsImageReference,
-      referenceImageUrl: videoConfig.referenceImageUrl,
-    });
-  }, [videoConfig, currentVideoModel]);
-  
-  // Update videoConfig.systemPrompt when finalVideoSystemPrompt changes
-  useEffect(() => {
-    setVideoConfig(c => ({ ...c, systemPrompt: finalVideoSystemPrompt }));
-  }, [finalVideoSystemPrompt]);
-  
-  // Update video config when model changes (reset to model defaults)
-  const handleVideoModelChange = (modelName: VideoModel) => {
-    const model = VIDEO_MODELS.find(m => m.name === modelName);
-    if (model) {
-      setVideoConfig(c => ({
-        ...c,
-        model: modelName,
-        duration: Math.min(Math.max(c.duration, model.minDuration), model.maxDuration),
-        width: model.defaultWidth,
-        height: model.defaultHeight,
-        enableSound: model.supportsSoundGeneration ? c.enableSound : false,
-        useImageReference: model.supportsImageReference ? c.useImageReference : false,
-      }));
-    }
+    return parts.length === 1 ? parts[0] : <>{parts}</>;
   };
 
-  useEffect(() => {
-    if (!settingsLoading && !settings.apiKey) {
-      setShowSettings(true);
-    }
-  }, [settingsLoading, settings.apiKey]);
-
-  // Auto-load products on mount
-  useEffect(() => {
-    if (xoobayProducts.length === 0 && !xoobayLoading) {
-      searchProducts({ pageNo: 1 }, { lang: xoobayLang }).catch(console.error);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Map XOOBAY language to AI output language
-  const mapXoobayLangToOutputLang = (xoobayLang: XoobayLanguage): string => {
-    const langMap: Record<XoobayLanguage, string> = {
-      'zh_cn': 'zh-CN',
-      'en': 'en',
-      'zh_hk': 'zh-TW',
-      'ru': 'ru',
-    };
-    return langMap[xoobayLang] || 'auto';
-  };
-
-  const handleReadPage = async () => {
-      if (selectedProductId) {
-        const content = await loadProductAsPageContent(selectedProductId, { lang: xoobayLang });
-        if (content) {
-          setPageContent(content);
-          setEditedContent(content.text);
-          setSelectedImages(content.images || []);
-          updateSessionPageContent(content);
-        // 可选：自动同步 AI 输出语言到 XOOBAY 语言
-        // 如果当前是 auto 或与 XOOBAY 语言不匹配，则自动同步
-        const mappedLang = mapXoobayLangToOutputLang(xoobayLang);
-        if (aiConfig.outputLanguage === 'auto' || aiConfig.outputLanguage !== mappedLang) {
-          setAiConfig(c => ({ ...c, outputLanguage: mappedLang }));
-        }
-        setStep('edit');
-      }
-    }
-  };
-
-  // Handle XOOBAY product search
-  const handleXoobaySearch = async () => {
-    try {
-      await searchProducts(
-        {
-          pageNo: 1,
-          name: xoobaySearchTerm || undefined,
-        },
-        { lang: xoobayLang }
-      );
-    } catch (err) {
-      console.error('Search error:', err);
-    }
-  };
-
-  // Load more products (next page)
-  const handleXoobayLoadMore = async () => {
-    if (xoobayPage < xoobayTotalPages) {
-      try {
-        await searchProducts(
-          {
-            pageNo: xoobayPage + 1,
-            name: xoobaySearchTerm || undefined,
-          },
-          { lang: xoobayLang }
-        );
-      } catch (err) {
-        console.error('Load more error:', err);
-      }
-    }
-  };
-
-
-  const handleToggleImage = (index: number) => {
-    if (!pageContent) return;
-    const img = pageContent.images[index];
-    const isSelected = selectedImages.some(i => i.src === img.src);
-    
-    if (isSelected) {
-      setSelectedImages(selectedImages.filter(i => i.src !== img.src));
-    } else {
-      setSelectedImages([...selectedImages, img]);
-    }
-  };
-
-  const handleSelectAllImages = () => {
-    if (!pageContent) return;
-    setSelectedImages([...pageContent.images]);
-  };
-
-  const handleDeselectAllImages = () => {
-    setSelectedImages([]);
-  };
-
-  const handleConfirmContent = () => {
-    setStep('config');
-  };
-
-  const handleResetConfig = () => {
-    if (configMode === 'text') {
-      setAiConfig({
-        ...DEFAULT_AI_CONFIG,
-        outputLanguage: 'auto',
-        outputFormat: 'markdown',
-        reasoningEffort: 'medium',
-        enableWebSearch: false,
-        systemPrompt: buildSystemPrompt('auto', 'markdown', 'medium', false, settings.brandName, settings.companyName),
-      });
-    } else {
-      setVideoConfig(DEFAULT_VIDEO_CONFIG);
-    }
-  };
-
-  const handleSendToAI = async () => {
-    // Build user content with images
-    let userContent = editedContent;
-    
-    if (selectedImages.length > 0) {
-      userContent += '\n\n---\n\n## Images on this page:\n\n';
-      selectedImages.forEach((img, index) => {
-        userContent += `${index + 1}. ![${img.alt || 'Image'}](${img.src})`;
-        if (img.alt) userContent += ` - Alt: "${img.alt}"`;
-        if (img.width && img.height) userContent += ` (${img.width}x${img.height})`;
-        userContent += '\n';
-      });
-    }
-    
-    if (configMode === 'video') {
-      // Use video generation
-      const result = await sendVideoRequest(userContent, finalVideoSystemPrompt, videoConfig, settings);
-      
-      // Save to media library if successful (result is VideoGenerationResult directly)
-      if (result && result.status === 'completed') {
-        const mediaType = result.type === 'video' ? 'video' : 'text';
-        addMediaItem({
-          type: mediaType,
-          name: `${mediaType === 'video' ? '🎬' : '📝'} ${new Date().toLocaleString()}`,
-          prompt: result.prompt || userContent.substring(0, 100),
-          content: result.content,
-          videoUrl: result.videoUrl,
-          thumbnailUrl: result.thumbnailUrl,
-          metadata: {
-            model: videoConfig.model,
-            duration: videoConfig.duration,
-            width: videoConfig.width,
-            height: videoConfig.height,
-            style: videoConfig.videoStyle,
-            language: videoConfig.targetLanguage,
-          },
-        });
-      }
-    } else {
-      // Use text generation
-      await sendPrompt(userContent, settings, aiConfig);
-    }
-    setStep('result');
-  };
-  
-  // Save text result to media library
-  const handleSaveTextToLibrary = () => {
-    if (!aiResult) return;
-    
-    addMediaItem({
-      type: 'text',
-      name: `📝 ${pageContent?.title?.substring(0, 30) || 'Text'} - ${new Date().toLocaleString()}`,
-      prompt: editedContent.substring(0, 200),
-      content: aiResult,
-      metadata: {
-        model: settings.model,
-        language: aiConfig.outputLanguage,
-      },
-    });
-  };
-
-  const handleReset = () => {
-    setStep('read');
-    setPageContent(null);
-    setEditedContent('');
-    setSelectedImages([]);
-    clearResult();
-  };
-
-  // Test all configured models
-  const handleTestAllModels = async () => {
-    if (testingModels) return;
-
-    setTestingModels(true);
-    setTestResults({});
-
-    const testPrompt = 'Say "Hello" in one sentence.';
-    const modelsToTest: Array<{ provider: string; model: string; displayName: string }> = [];
-
-    // Collect all models from all providers
-    Object.entries(PROVIDER_MODELS).forEach(([provider, models]) => {
-      models.forEach(model => {
-        modelsToTest.push({
-          provider,
-          model,
-          displayName: `${PROVIDERS_LIST.find(p => p.id === provider)?.name || provider} - ${model}`,
-        });
-      });
-    });
-
-    // Initialize all as pending
-    const initialResults: typeof testResults = {};
-    modelsToTest.forEach(({ displayName }) => {
-      initialResults[displayName] = { status: 'pending' };
-    });
-    setTestResults(initialResults);
-
-    // Test each model sequentially
-    for (const { provider, model, displayName } of modelsToTest) {
-      setTestResults(prev => ({
-        ...prev,
-        [displayName]: { status: 'testing' },
-      }));
-
-      try {
-        // Create test settings for this model
-        const testSettings: Settings = {
-          ...settings,
-          provider: provider as any,
-          model: model,
-          apiMode: 'internal', // Always use internal mode for testing
-        };
-
-        // Create minimal AI config for testing
-        const testAiConfig: AIConfig = {
-          ...DEFAULT_AI_CONFIG,
-          systemPrompt: 'You are a helpful assistant.',
-          outputLanguage: 'auto',
-          outputFormat: 'markdown',
-          reasoningEffort: 'low',
-          enableWebSearch: false,
-        };
-
-        // Send test request directly using sendToAI service
-        const result = await sendToAI(testPrompt, testSettings, testAiConfig);
-
-        if (result.error) {
-          setTestResults(prev => ({
-            ...prev,
-            [displayName]: {
-              status: 'error',
-              message: result.error || 'Unknown error',
-            },
-          }));
-        } else if (result.content) {
-          const preview = result.content.substring(0, 100).replace(/\n/g, ' ');
-          setTestResults(prev => ({
-            ...prev,
-            [displayName]: {
-              status: 'success',
-              response: preview,
-            },
-          }));
-        } else {
-          setTestResults(prev => ({
-            ...prev,
-            [displayName]: {
-              status: 'error',
-              message: 'No response received',
-            },
-          }));
-        }
-      } catch (error) {
-        setTestResults(prev => ({
-          ...prev,
-          [displayName]: {
-            status: 'error',
-            message: error instanceof Error ? error.message : String(error),
-          },
-        }));
-      }
-
-      // Small delay between tests to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    setTestingModels(false);
-  };
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
-  const handleDownload = () => {
-    if (!aiResult) return;
-    const ext = aiConfig.outputFormat === 'json' ? 'json' : aiConfig.outputFormat === 'html' ? 'html' : 'md';
-    const blob = new Blob([aiResult], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `page-reader-result-${Date.now()}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // Enhanced Markdown renderer
   const renderMarkdown = (markdown: string) => {
-    const lines = markdown.split('\n');
+    const lines = markdown.split("\n");
     const elements: React.ReactNode[] = [];
     let listItems: string[] = [];
-    let orderedListItems: string[] = [];
-    let codeBlock: string[] = [];
-    let inCodeBlock = false;
-    let codeLanguage = '';
-    let blockquoteLines: string[] = [];
 
     const flushList = () => {
       if (listItems.length > 0) {
         elements.push(
-          <ul key={elements.length} className="list-disc list-inside space-y-1 my-3 text-dark-200 pl-2">
+          <ul key={"ul-" + elements.length} className="list-disc list-inside space-y-1 my-3 text-slate-600 pl-2">
             {listItems.map((item, i) => <li key={i}>{renderInlineMarkdown(item)}</li>)}
           </ul>
         );
@@ -527,1912 +250,1081 @@ export const App: React.FC = () => {
       }
     };
 
-    const flushOrderedList = () => {
-      if (orderedListItems.length > 0) {
-        elements.push(
-          <ol key={elements.length} className="list-decimal list-inside space-y-1 my-3 text-dark-200 pl-2">
-            {orderedListItems.map((item, i) => <li key={i}>{renderInlineMarkdown(item)}</li>)}
-          </ol>
-        );
-        orderedListItems = [];
-      }
-    };
-
-    const flushCodeBlock = () => {
-      if (codeBlock.length > 0) {
-        elements.push(
-          <div key={elements.length} className="my-4 rounded-xl overflow-hidden border border-dark-700">
-            {codeLanguage && (
-              <div className="px-3 py-1.5 bg-dark-800 border-b border-dark-700 text-xs text-dark-400 font-mono">
-                {codeLanguage}
-              </div>
-            )}
-            <pre className="p-3 bg-dark-900 overflow-x-auto">
-              <code className="text-sm text-emerald-400 font-mono">{codeBlock.join('\n')}</code>
-            </pre>
-          </div>
-        );
-        codeBlock = [];
-        codeLanguage = '';
-      }
-    };
-
-    const flushBlockquote = () => {
-      if (blockquoteLines.length > 0) {
-        elements.push(
-          <blockquote key={elements.length} className="my-4 pl-4 border-l-4 border-primary-500 bg-dark-800/30 py-2 pr-4 rounded-r-lg">
-            {blockquoteLines.map((line, i) => (
-              <p key={i} className="text-dark-300 italic">{renderInlineMarkdown(line)}</p>
-            ))}
-          </blockquote>
-        );
-        blockquoteLines = [];
-      }
-    };
-
-    // Render inline markdown (bold, italic, code, links)
-    const renderInlineMarkdown = (text: string): React.ReactNode => {
-      const parts: React.ReactNode[] = [];
-      let remaining = text;
-      let key = 0;
-
-      while (remaining.length > 0) {
-        // Bold **text** or __text__
-        const boldMatch = remaining.match(/^(.*?)(\*\*|__)(.+?)\2(.*)$/s);
-        if (boldMatch) {
-          if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>);
-          parts.push(<strong key={key++} className="font-semibold text-white">{boldMatch[3]}</strong>);
-          remaining = boldMatch[4];
-          continue;
-        }
-
-        // Italic *text* or _text_
-        const italicMatch = remaining.match(/^(.*?)(\*|_)([^*_]+)\2(.*)$/s);
-        if (italicMatch) {
-          if (italicMatch[1]) parts.push(<span key={key++}>{italicMatch[1]}</span>);
-          parts.push(<em key={key++} className="italic text-dark-300">{italicMatch[3]}</em>);
-          remaining = italicMatch[4];
-          continue;
-        }
-
-        // Inline code `code`
-        const codeMatch = remaining.match(/^(.*?)`([^`]+)`(.*)$/s);
-        if (codeMatch) {
-          if (codeMatch[1]) parts.push(<span key={key++}>{codeMatch[1]}</span>);
-          parts.push(<code key={key++} className="px-1.5 py-0.5 bg-dark-800 text-amber-400 rounded text-sm font-mono">{codeMatch[2]}</code>);
-          remaining = codeMatch[3];
-          continue;
-        }
-
-        // Links [text](url)
-        const linkMatch = remaining.match(/^(.*?)\[([^\]]+)\]\(([^)]+)\)(.*)$/s);
-        if (linkMatch) {
-          if (linkMatch[1]) parts.push(<span key={key++}>{linkMatch[1]}</span>);
-          parts.push(<a key={key++} href={linkMatch[3]} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300 underline">{linkMatch[2]}</a>);
-          remaining = linkMatch[4];
-          continue;
-        }
-
-        parts.push(<span key={key++}>{remaining}</span>);
-        break;
-      }
-
-      return parts.length === 1 ? parts[0] : <>{parts}</>;
-    };
-
     lines.forEach((line, index) => {
       const trimmed = line.trim();
-
-      // Code block
-      if (trimmed.startsWith('```')) {
-        if (inCodeBlock) {
-          inCodeBlock = false;
-          flushCodeBlock();
-        } else {
-          flushList();
-          flushOrderedList();
-          flushBlockquote();
-          inCodeBlock = true;
-          codeLanguage = trimmed.slice(3).trim();
-        }
-        return;
-      }
-
-      if (inCodeBlock) {
-        codeBlock.push(line);
-        return;
-      }
-
-      // Blockquote
-      if (trimmed.startsWith('> ')) {
+      if (trimmed.startsWith("# ")) {
         flushList();
-        flushOrderedList();
-        blockquoteLines.push(trimmed.slice(2));
-        return;
-      } else {
-        flushBlockquote();
-      }
-
-      // Headers
-      if (trimmed.startsWith('# ')) {
+        elements.push(<h1 key={index} className="text-2xl font-bold text-slate-900 mt-6 mb-3">{renderInlineMarkdown(trimmed.slice(2))}</h1>);
+      } else if (trimmed.startsWith("## ")) {
         flushList();
-        flushOrderedList();
-        elements.push(<h1 key={index} className="text-2xl font-bold text-white mt-6 mb-3">{renderInlineMarkdown(trimmed.slice(2))}</h1>);
-      } else if (trimmed.startsWith('## ')) {
-        flushList();
-        flushOrderedList();
-        elements.push(<h2 key={index} className="text-xl font-semibold text-white mt-5 mb-2 border-b border-dark-700 pb-2">{renderInlineMarkdown(trimmed.slice(3))}</h2>);
-      } else if (trimmed.startsWith('### ')) {
-        flushList();
-        flushOrderedList();
-        elements.push(<h3 key={index} className="text-lg font-medium text-primary-300 mt-4 mb-2">{renderInlineMarkdown(trimmed.slice(4))}</h3>);
-      } else if (trimmed.startsWith('#### ')) {
-        flushList();
-        flushOrderedList();
-        elements.push(<h4 key={index} className="text-base font-medium text-primary-400 mt-3 mb-1">{renderInlineMarkdown(trimmed.slice(5))}</h4>);
-      } else if (trimmed.startsWith('##### ')) {
-        flushList();
-        flushOrderedList();
-        elements.push(<h5 key={index} className="text-sm font-medium text-dark-200 mt-2 mb-1">{renderInlineMarkdown(trimmed.slice(6))}</h5>);
-      }
-      // Horizontal rule
-      else if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
-        flushList();
-        flushOrderedList();
-        elements.push(<hr key={index} className="my-6 border-dark-700" />);
-      }
-      // Unordered list
-      else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        flushOrderedList();
+        elements.push(<h2 key={index} className="text-xl font-bold text-slate-900 mt-5 mb-2 border-b border-slate-100 pb-2">{renderInlineMarkdown(trimmed.slice(3))}</h2>);
+      } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
         listItems.push(trimmed.slice(2));
-      }
-      // Ordered list
-      else if (/^\d+\.\s/.test(trimmed)) {
+      } else if (trimmed) {
         flushList();
-        orderedListItems.push(trimmed.replace(/^\d+\.\s/, ''));
-      }
-      // Tags
-      else if (trimmed.startsWith('Tags:')) {
+        elements.push(<p key={index} className="text-slate-600 my-2 leading-relaxed">{renderInlineMarkdown(trimmed)}</p>);
+      } else {
         flushList();
-        flushOrderedList();
-        const tags = trimmed.slice(5).split(',').map(t => t.trim()).filter(Boolean);
-        elements.push(
-          <div key={index} className="mt-6 pt-4 border-t border-dark-700">
-            <span className="text-xs text-dark-400 mr-2">Tags:</span>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {tags.map((tag, i) => (
-                <span key={i} className="px-2 py-0.5 bg-primary-500/20 text-primary-300 text-xs rounded-full">{tag}</span>
-              ))}
-            </div>
-          </div>
-        );
-      }
-      // Paragraph
-      else if (trimmed) {
-        flushList();
-        flushOrderedList();
-        elements.push(<p key={index} className="text-dark-200 my-2 leading-relaxed">{renderInlineMarkdown(trimmed)}</p>);
+        elements.push(<div key={index} className="h-2" />);
       }
     });
-    
+
     flushList();
-    flushOrderedList();
-    flushBlockquote();
-    flushCodeBlock();
     return elements;
   };
 
-  // HTML renderer - sanitize and render
-  const renderHtml = (html: string) => {
-    // Basic sanitization - remove script tags
-    const sanitized = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/on\w+="[^"]*"/gi, '')
-      .replace(/on\w+='[^']*'/gi, '');
-    
-    return (
-      <div 
-        className="prose prose-invert max-w-none prose-headings:text-white prose-p:text-dark-200 prose-a:text-primary-400 prose-strong:text-white prose-code:text-amber-400 prose-code:bg-dark-800 prose-code:px-1 prose-code:rounded"
-        dangerouslySetInnerHTML={{ __html: sanitized }} 
-      />
-    );
-  };
-
-  // JSON renderer with syntax highlighting
-  const renderJson = (jsonStr: string) => {
-    try {
-      // Try to extract JSON from code blocks
-      const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const cleanJson = jsonMatch ? jsonMatch[1].trim() : jsonStr.trim();
-      const data = JSON.parse(cleanJson);
-      return renderJsonObject(data, 0);
-    } catch {
-      // If not valid JSON, show as formatted text
-      return <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono">{jsonStr}</pre>;
-    }
-  };
-
-  const renderJsonObject = (obj: unknown, depth: number): React.ReactNode => {
-    if (obj === null) {
-      return <span className="text-dark-500 italic">null</span>;
-    }
-    if (obj === undefined) {
-      return <span className="text-dark-500 italic">undefined</span>;
-    }
-    if (typeof obj === 'string') {
-      return <span className="text-emerald-400">"{obj}"</span>;
-    }
-    if (typeof obj === 'number') {
-      return <span className="text-amber-400">{obj}</span>;
-    }
-    if (typeof obj === 'boolean') {
-      return <span className="text-purple-400">{String(obj)}</span>;
-    }
-    if (Array.isArray(obj)) {
-      if (obj.length === 0) {
-        return <span className="text-dark-400">[]</span>;
-      }
-      // Check if simple array (all primitives)
-      const isSimple = obj.every(item => typeof item !== 'object' || item === null);
-      if (isSimple && obj.length <= 5) {
-        return (
-          <span>
-            <span className="text-dark-400">[</span>
-            {obj.map((item, i) => (
-              <span key={i}>
-                {renderJsonObject(item, depth + 1)}
-                {i < obj.length - 1 && <span className="text-dark-400">, </span>}
-              </span>
-            ))}
-            <span className="text-dark-400">]</span>
-          </span>
-        );
-      }
-      return (
-        <div className={`${depth > 0 ? 'ml-4' : ''}`}>
-          <span className="text-dark-400">[</span>
-          {obj.map((item, i) => (
-            <div key={i} className="ml-4">
-              {renderJsonObject(item, depth + 1)}
-              {i < obj.length - 1 && <span className="text-dark-400">,</span>}
-            </div>
-          ))}
-          <span className="text-dark-400">]</span>
-        </div>
-      );
-    }
-    if (typeof obj === 'object') {
-      const entries = Object.entries(obj);
-      if (entries.length === 0) {
-        return <span className="text-dark-400">{'{}'}</span>;
-      }
-      return (
-        <div className={`${depth > 0 ? 'ml-4 border-l-2 border-dark-700 pl-3' : ''} space-y-2`}>
-          {entries.map(([key, value], i) => (
-            <div key={i} className="group">
-              <span className="text-primary-300 font-medium">{key}</span>
-              <span className="text-dark-500">: </span>
-              {typeof value === 'object' && value !== null && !Array.isArray(value) ? (
-                <div className="mt-1">{renderJsonObject(value, depth + 1)}</div>
-              ) : Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' ? (
-                <div className="mt-1">{renderJsonObject(value, depth + 1)}</div>
-              ) : (
-                renderJsonObject(value, depth + 1)
-              )}
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return <span className="text-dark-300">{String(obj)}</span>;
-  };
-
-  // Plain text renderer with line breaks preserved
-  const renderPlainText = (text: string) => {
-    const lines = text.split('\n');
-    return (
-      <div className="font-mono text-sm space-y-2">
-        {lines.map((line, i) => {
-          // Detect ALL CAPS headings
-          if (/^[A-Z][A-Z\s&]+$/.test(line.trim()) && line.trim().length > 3) {
-            return <h3 key={i} className="text-lg font-bold text-white mt-4 mb-2">{line}</h3>;
-          }
-          // Detect dashed list items
-          if (line.trim().startsWith('-')) {
-            return <p key={i} className="text-dark-200 pl-4">{line}</p>;
-          }
-          // Empty lines
-          if (!line.trim()) {
-            return <div key={i} className="h-2" />;
-          }
-          return <p key={i} className="text-dark-200">{line}</p>;
-        })}
-      </div>
-    );
-  };
-
-  // Main render function that detects format
   const renderResult = (content: string, format: string) => {
-    switch (format) {
-      case 'html':
-        return renderHtml(content);
-      case 'json':
-        return renderJson(content);
-      case 'plain':
-        return renderPlainText(content);
-      case 'markdown':
-      default:
-        return renderMarkdown(content);
+    if (format === "html") {
+      return <div className="prose prose-slate max-w-none text-sm" dangerouslySetInnerHTML={{ __html: content }} />;
+    }
+    if (format === "json") {
+      try {
+        const data = JSON.parse(content.replace(/```json\s*|```/g, ""));
+        return <pre className="text-xs p-4 bg-slate-100 rounded-xl overflow-x-auto font-mono">{JSON.stringify(data, null, 2)}</pre>;
+      } catch {
+        return <pre className="text-xs p-4 bg-slate-100 rounded-xl whitespace-pre-wrap font-mono">{content}</pre>;
+      }
+    }
+    return <div className="text-sm">{renderMarkdown(content)}</div>;
+  };
+
+  // --- 4. Logic Handlers ---
+  const handleXoobaySearch = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const xoobayLang: XoobayLanguage = lang === "zh" ? "zh_cn" : "en";
+    searchProducts({ pageNo: 1, name: searchTerm }, { lang: xoobayLang });
+    setJumpInputValue("");
+  };
+
+  const handlePageJump = () => {
+    const page = parseInt(jumpInputValue);
+    if (!isNaN(page) && page > 0 && page <= xoobayTotalPages) {
+      const xoobayLang: XoobayLanguage = lang === "zh" ? "zh_cn" : "en";
+      searchProducts({ pageNo: page, name: searchTerm }, { lang: xoobayLang });
     }
   };
 
-  // Get current config summary
-  const getConfigSummary = () => {
-    const parts: string[] = [];
-    
-    const lang = OUTPUT_LANGUAGES.find(l => l.code === aiConfig.outputLanguage);
-    if (lang) parts.push(`🌐 ${lang.label}`);
-    
-    const fmt = OUTPUT_FORMATS.find(f => f.code === aiConfig.outputFormat);
-    if (fmt) parts.push(`${fmt.icon} ${fmt.label}`);
-    
-    const reason = REASONING_LEVELS.find(r => r.value === aiConfig.reasoningEffort);
-    if (reason) parts.push(`🧠 ${reason.label}`);
-    
-    if (aiConfig.enableWebSearch) parts.push('🔍 Web');
-    
-    return parts.join(' • ');
+  const handleSelectProduct = async (productId: number) => {
+    const xoobayLang: XoobayLanguage = lang === "zh" ? "zh_cn" : "en";
+    const content = await loadProductAsPageContent(productId, { lang: xoobayLang });
+    if (content) {
+      setPageContent(content);
+      setEditedContent(content.text);
+      setSelectedImages(content.images || []);
+      setSelectedProductId(productId);
+    }
   };
+
+  const handleNext = () => {
+    if (step === 1 && pageContent) {
+      setStep(2);
+    } else if (step === 2) {
+      updateSessionPageContent({ ...pageContent!, text: editedContent });
+      setStep(3);
+    } else if (step === 3) {
+      handleGenerate();
+    }
+  };
+
+  const handleGenerate = async () => {
+    setStep(4);
+    
+    if (generationMode === "text") {
+      // 文本生成逻辑
+      let userPrompt = editedContent;
+      if (selectedImages.length > 0) {
+        userPrompt += "\n\n---\n\n## References Images:\n";
+        selectedImages.forEach((img, i) => {
+          userPrompt += `${i + 1}. ![${img.alt || "IMG"}](${img.src})\n`;
+        });
+      }
+
+      const systemPrompt = buildSystemPrompt(
+        aiConfig.outputLanguage,  // 使用用户选择的目标语言，而不是UI语言
+        aiConfig.outputFormat,
+        aiConfig.reasoningEffort,
+        aiConfig.enableWebSearch,
+        settings.brandName,
+        settings.companyName
+      );
+
+      await sendPrompt(userPrompt, settings, { ...aiConfig, systemPrompt });
+    } else {
+      // 视频生成逻辑
+      const videoSystemPrompt = buildVideoSystemPrompt({
+        modelName: videoConfig.model,
+        minDuration: videoConfig.duration,
+        maxDuration: videoConfig.duration,
+        aspectRatio: `${videoConfig.width}:${videoConfig.height}`,
+        brandName: settings.brandName || videoConfig.brandName,
+        brandUrl: videoConfig.brandUrl,
+        targetLanguage: videoConfig.targetLanguage,
+        videoStyle: videoConfig.videoStyle,
+        enableSound: videoConfig.enableSound,
+        useImageReference: videoConfig.useImageReference,
+        referenceImageUrl: videoConfig.referenceImageUrl || undefined,
+      });
+
+      await sendVideoRequest(editedContent, videoSystemPrompt, videoConfig, settings);
+    }
+  };
+
+  const handleRestart = () => {
+    setStep(1);
+    clearResult();
+    setSelectedProductId(null);
+    setPageContent(null);
+    setEditedContent("");
+    setSearchTerm("");
+  };
+
+  const handleTestAllModels = async () => {
+    if (testingModels) return;
+    setTestingModels(true);
+    setTestResults({});
+
+    for (const provider of PROVIDERS_LIST) {
+      setTestResults(prev => ({ ...prev, [provider.id]: { status: "testing" } }));
+      try {
+        const models = PROVIDER_MODELS[provider.id as keyof typeof PROVIDER_MODELS];
+        if (!models?.length) {
+          setTestResults(prev => ({ ...prev, [provider.id]: { status: "error" } }));
+          continue;
+        }
+        const testSettings = { ...settings, provider: provider.id as any, model: models[0], apiMode: "internal" as const };
+        const res = await sendToAI("hi", testSettings, DEFAULT_AI_CONFIG);
+        setTestResults(prev => ({ ...prev, [provider.id]: { status: res.error ? "error" : "success" } }));
+      } catch {
+        setTestResults(prev => ({ ...prev, [provider.id]: { status: "error" } }));
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    setTestingModels(false);
+  };
+
+  // Initial Sync
+  useEffect(() => {
+    handleXoobaySearch();
+  }, [lang]);
 
   if (settingsLoading) {
     return (
-      <div className="h-screen bg-dark-900 flex items-center justify-center">
-        <div className="animate-pulse text-dark-400">Loading...</div>
+      <div className="h-screen bg-white flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
-      <div className="w-full p-2 lg:max-w-6xl lg:mx-auto lg:p-4">
-      {/* Header */}
-        <header className="px-3 py-2.5 lg:px-4 lg:py-3 border-b border-dark-800 bg-dark-900/80 flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            </div>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans flex flex-col antialiased">
+      {/* --- Header --- */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 h-20 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+            <Zap className="text-white w-8 h-8 fill-current" />
+          </div>
           <div>
-              <h1 className="text-base font-bold text-white">AI SEO</h1>
-            <p className="text-xs text-dark-400 truncate max-w-32" title={activeSession?.name}>
-              {activeSession?.name || settings.model}
-            </p>
+            <h1 className="text-lg font-black tracking-tight uppercase leading-none">{t.title}</h1>
+            <p className="text-xs text-blue-600 font-bold mt-1.5 tracking-widest uppercase">{t.enterprise}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          {/* Sessions Button */}
-          <button
-            onClick={() => setSidePanel(sidePanel === 'sessions' ? null : 'sessions')}
-            className={`p-2 rounded-lg transition-colors ${sidePanel === 'sessions' ? 'bg-blue-500/20 text-blue-400' : 'text-dark-400 hover:bg-dark-800'}`}
-            title="Sessions"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          </button>
-          {/* Media Library Button - folder/collection icon */}
-          <button
-            onClick={() => setSidePanel(sidePanel === 'media' ? null : 'media')}
-            className={`p-2 rounded-lg transition-colors relative ${sidePanel === 'media' ? 'bg-purple-500/20 text-purple-400' : 'text-dark-400 hover:bg-dark-800'}`}
-            title="My Library"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            {mediaLibrary.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                {mediaLibrary.length}
+
+        <div className="flex items-center gap-5">
+          <div onClick={() => setModal("account")} className="hidden md:flex items-center gap-4 bg-slate-100 px-5 py-3 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-200 transition-all">
+            <div className="flex flex-col items-end leading-none">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t.quota}</span>
+              <span className="text-sm font-bold text-slate-700 mt-1">
+                {(settings?.usageLimit || 0) - (settings?.usageCount || 0)} <span className="text-slate-400 font-medium">PTS</span>
               </span>
-            )}
-          </button>
-          {/* Settings Button */}
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-primary-500/20 text-primary-400' : 'text-dark-400 hover:bg-dark-800'}`}
-            title="Settings"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
-      </header>
-      
-      {/* Side Panel - Sessions & Media Library */}
-      {sidePanel && (
-        <div className="border-b border-dark-800 bg-dark-900/80 animate-fadeIn">
-          {/* Sessions Panel */}
-          {sidePanel === 'sessions' && (
-            <div className="p-3 space-y-2 max-h-64 overflow-y-auto">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-blue-400">📁 Sessions</h3>
-                <button
-                  onClick={() => createSession()}
-                  className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
-                >
-                  + New
-                </button>
-              </div>
-              {sessions.map(session => (
-                <div
-                  key={session.id}
-                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${session.id === activeSessionId
-                      ? 'bg-blue-500/20 border border-blue-500/50' 
-                      : 'bg-dark-800/50 border border-dark-700/50 hover:bg-dark-800'
-                  }`}
-                >
-                  {editingSessionId === session.id ? (
-                    <input
-                      type="text"
-                      value={editingSessionName}
-                      onChange={(e) => setEditingSessionName(e.target.value)}
-                      onBlur={() => {
-                        if (editingSessionName.trim()) {
-                          renameSession(session.id, editingSessionName.trim());
-                        }
-                        setEditingSessionId(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          if (editingSessionName.trim()) {
-                            renameSession(session.id, editingSessionName.trim());
-                          }
-                          setEditingSessionId(null);
-                        } else if (e.key === 'Escape') {
-                          setEditingSessionId(null);
-                        }
-                      }}
-                      className="flex-1 px-2 py-1 bg-dark-700 border border-dark-600 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      autoFocus
-                    />
-                  ) : (
-                    <>
-                      <div 
-                        className="flex-1 min-w-0"
-                        onClick={() => switchSession(session.id)}
-                      >
-                        <p className="text-sm text-white truncate">{session.name}</p>
-                        <p className="text-xs text-dark-500 truncate">
-                          {session.mediaLibrary.length} items • {new Date(session.updatedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingSessionId(session.id);
-                          setEditingSessionName(session.name);
-                        }}
-                        className="p-1 text-dark-400 hover:text-white transition-colors"
-                        title="Rename"
-                      >
-                        ✏️
-                      </button>
-                      {sessions.length > 1 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm('Delete this session?')) {
-                              deleteSession(session.id);
-                            }
-                          }}
-                          className="p-1 text-dark-400 hover:text-red-400 transition-colors"
-                          title="Delete"
-                        >
-                          🗑️
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
             </div>
-          )}
-          
-          {/* My Library Panel */}
-          {sidePanel === 'media' && (
-            <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-purple-400">📚 My Library</h3>
-                {mediaLibrary.length > 0 && (
-                  <button
-                    onClick={() => {
-                      if (confirm('Clear all media items?')) {
-                        clearMediaLibrary();
-                      }
-                    }}
-                    className="px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-              {mediaLibrary.length === 0 ? (
-                <p className="text-xs text-dark-500 text-center py-4">
-                  No media yet. Generate videos or text to populate your library.
-                </p>
-              ) : (
-                mediaLibrary.map(item => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-2 p-2 bg-dark-800/50 border border-dark-700/50 rounded-lg hover:bg-dark-800 transition-all"
-                  >
-                    {/* Thumbnail/Icon */}
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${item.type === 'video' ? 'bg-purple-500/20' : 'bg-green-500/20'
+            <div className="w-px h-6 bg-slate-300"></div>
+            <button onClick={(e) => { e.stopPropagation(); setModal("upgrade"); }} className="text-sm font-black text-blue-600 uppercase hover:text-blue-700">{t.upgrade}</button>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+            <button onClick={() => setLang("zh")} className={`px-3 py-2 text-xs font-black rounded-lg transition-all ${lang === "zh" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400"}`}>中</button>
+            <button onClick={() => setLang("en")} className={`px-3 py-2 text-xs font-black rounded-lg transition-all ${lang === "en" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400"}`}>EN</button>
+          </div>
+
+          <button onClick={() => setModal("settings")} className="p-3 text-slate-400 hover:bg-slate-100 rounded-xl transition-all">
+            <SettingsIcon className="w-6 h-6" />
+          </button>
+          <div onClick={() => setModal("account")} className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center cursor-pointer hover:scale-105 transition-all">
+            <UserIcon className="w-5 h-5 text-slate-500" />
+          </div>
+        </div>
+      </nav>
+
+      {/* --- Main Workflow --- */}
+      <main className="flex-1 max-w-7xl mx-auto w-full p-4 lg:p-8 flex flex-col">
+        <div className="w-full max-w-2xl mx-auto mb-10">
+          <div className="flex items-center justify-between px-2">
+            {t.steps.map((s, idx) => (
+              <React.Fragment key={idx}>
+                <div className="flex flex-col items-center gap-2">
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 ${step === idx + 1 ? "bg-blue-600 text-white shadow-xl shadow-blue-100 ring-4 ring-blue-50" :
+                      step > idx + 1 ? "bg-emerald-500 text-white shadow-lg" : "bg-white text-slate-300 border border-slate-200"
                     }`}>
-                      {item.type === 'video' ? '🎬' : '📝'}
-                    </div>
-                    
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      {editingMediaId === item.id ? (
-                        <input
-                          type="text"
-                          value={editingMediaName}
-                          onChange={(e) => setEditingMediaName(e.target.value)}
-                          onBlur={() => {
-                            if (editingMediaName.trim()) {
-                              renameMediaItem(item.id, editingMediaName.trim());
-                            }
-                            setEditingMediaId(null);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              if (editingMediaName.trim()) {
-                                renameMediaItem(item.id, editingMediaName.trim());
-                              }
-                              setEditingMediaId(null);
-                            } else if (e.key === 'Escape') {
-                              setEditingMediaId(null);
-                            }
-                          }}
-                          className="w-full px-2 py-1 bg-dark-700 border border-dark-600 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-                          autoFocus
-                        />
-                      ) : (
-                        <p className="text-sm text-white truncate">{item.name}</p>
-                      )}
-                      <p className="text-xs text-dark-500 truncate">{item.metadata.model}</p>
-                      {item.type === 'video' && item.metadata.duration && (
-                        <p className="text-xs text-purple-400">{item.metadata.duration}s • {item.metadata.width}x{item.metadata.height}</p>
-                      )}
-                    </div>
-                    
-                    {/* Actions */}
-                    <div className="flex flex-col gap-1">
-                      {item.type === 'video' && item.videoUrl && (
-                        <a
-                          href={item.videoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1 text-purple-400 hover:bg-purple-500/20 rounded transition-colors"
-                          title="Open Video"
-                        >
-                          ▶️
-                        </a>
-                      )}
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(item.content || item.videoUrl || '');
-                        }}
-                        className="p-1 text-dark-400 hover:text-white transition-colors"
-                        title="Copy"
-                      >
-                        📋
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingMediaId(item.id);
-                          setEditingMediaName(item.name);
-                        }}
-                        className="p-1 text-dark-400 hover:text-white transition-colors"
-                        title="Rename"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => removeMediaItem(item.id)}
-                        className="p-1 text-dark-400 hover:text-red-400 transition-colors"
-                        title="Delete"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                    {step > idx + 1 ? <CheckCircle2 className="w-5 h-5" /> : (
+                      idx === 0 ? <Search className="w-4 h-4" /> :
+                        idx === 1 ? <FileText className="w-4 h-4" /> :
+                          idx === 2 ? <Sparkles className="w-4 h-4" /> : <BarChart3 className="w-4 h-4" />
+                    )}
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${step === idx + 1 ? "text-blue-600" : "text-slate-400"}`}>{s}</span>
+                </div>
+                {idx < 3 && <div className={`flex-1 h-0.5 mx-4 transition-colors duration-700 ${step > idx + 1 ? "bg-emerald-500" : "bg-slate-200"}`} />}
+              </React.Fragment>
+            ))}
+          </div>
         </div>
-      )}
 
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="p-4 border-b border-dark-800 bg-dark-900/50 space-y-4 animate-fadeIn max-h-96 overflow-y-auto">
-            {/* Internal vs Custom Mode */}
-          <div className="p-3 bg-dark-800/50 rounded-xl border border-dark-700/50 space-y-3">
-            <h4 className="text-xs font-semibold text-primary-400 flex items-center gap-2">
-                🏢 Commercial Config
-            </h4>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => updateSettings({ apiMode: 'internal' })}
-                  className={`px-3 py-2 text-xs rounded-lg transition-all ${settings.apiMode === 'internal' ? 'bg-primary-500 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                >
-                  Internal Mode
-                </button>
-                <button
-                  onClick={() => updateSettings({ apiMode: 'custom' })}
-                  className={`px-3 py-2 text-xs rounded-lg transition-all ${settings.apiMode === 'custom' ? 'bg-primary-500 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                >
-                  DIY Mode (Custom)
-                </button>
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl shadow-slate-200/40 overflow-hidden flex flex-col min-h-[1000px] animate-fadeIn">
+          {/* Step 1: Product Selection */}
+          {step === 1 && (
+            <div className="p-8 lg:p-12 flex-1 flex flex-col animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 mb-2">
+                <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
+                  <Package className="w-5 h-5 text-blue-600" />
+                </div>
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight">{t.noProducts === "No products found" ? "Select Data Source" : "选择产品数据源"}</h2>
               </div>
+              <p className="text-slate-400 text-base font-medium mb-10 pl-14 leading-relaxed">通过名称搜索或在列表中直接选择产品进行 AI SEO 优化</p>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs text-dark-400 mb-1.5">Company Name</label>
+              <form onSubmit={handleXoobaySearch} className="relative flex gap-3 mb-8">
+                <div className="relative flex-1 group">
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors w-5 h-5" />
                   <input
-                    type="text"
-                    value={settings.companyName}
-                    onChange={(e) => updateSettings({ companyName: e.target.value })}
-                    placeholder="Your Company"
-                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-14 pr-6 py-6 bg-slate-50 border border-slate-100 rounded-3xl text-base font-bold outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-200 transition-all shadow-inner"
+                    placeholder={t.searchPlaceholder}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-dark-400 mb-1.5">Brand Name</label>
-                  <input
-                    type="text"
-                    value={settings.brandName}
-                    onChange={(e) => updateSettings({ brandName: e.target.value })}
-                    placeholder="Your Brand"
-                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                  />
-                </div>
-              </div>
-            </div>
+                <button type="submit" className="px-10 py-6 bg-slate-900 text-white rounded-3xl text-sm font-black shadow-xl hover:bg-blue-600 transition-all active:scale-95">
+                  {lang === "zh" ? "立即搜索" : "Search"}
+                </button>
+              </form>
 
-            {/* AI Provider Settings */}
-            <div className={`p-4 rounded-xl border space-y-4 ${settings.apiMode === 'internal' ? 'bg-primary-500/5 border-primary-500/20' : 'bg-dark-800/50 border-dark-700/50'}`}>
-              {settings.apiMode === 'internal' ? (
-                /* --- INTERNAL MODE UI --- */
-                <>
-                  <h4 className="text-xs font-semibold text-primary-400 flex items-center gap-2">
-                    🏢 Corporate AI Agents
-                  </h4>
-
-                  {/* Premium Visual Provider Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {PROVIDERS_LIST.map((p) => {
-                      const isSelected = settings.provider === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => {
-                            const firstModel = PROVIDER_MODELS[p.id]?.[0] || '';
-                            updateSettings({ provider: p.id as any, model: firstModel });
-                          }}
-                          className={`group relative flex flex-col items-center p-3 rounded-2xl border transition-all duration-500 overflow-hidden ${isSelected
-                            ? `bg-dark-800 border-primary-500 ring-2 ring-primary-500/20 shadow-xl shadow-primary-500/10`
-                            : 'bg-dark-800/20 border-dark-700/50 hover:bg-dark-800/60 hover:border-dark-500'}`}
-                        >
-                          {isSelected && <div className={`absolute inset-0 opacity-10 blur-xl ${p.color}`} />}
-                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-2xl mb-2.5 transition-all duration-500 group-hover:rotate-6 group-hover:scale-110 ${isSelected ? p.color + ' shadow-lg shadow-' + p.color.split('-')[1] + '-500/40' : 'bg-dark-700/50 text-dark-300'}`}>
-                            {p.icon}
-                          </div>
-                          <span className={`text-[11px] font-bold tracking-tight ${isSelected ? 'text-white' : 'text-dark-300'}`}>{p.name}</span>
-                          <span className="text-[8px] text-dark-500 mt-0.5 uppercase tracking-wider">{p.company}</span>
-                          {isSelected && (
-                            <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center shadow-md animate-scaleIn">
-                              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+              <div className="flex-1 overflow-y-auto max-h-[700px] pr-2 scrollbar-thin">
+                <div className="grid grid-cols-2 gap-4">
+                  {xoobayLoading ? (
+                    <div className="col-span-2 flex flex-col items-center justify-center py-20 gap-4 opacity-50">
+                      <RefreshCw className="w-10 h-10 animate-spin text-blue-600" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">{t.loadProduct}...</span>
+                    </div>
+                  ) : xoobayProducts.length === 0 ? (
+                    <div className="col-span-2 text-center py-20 bg-slate-50/50 rounded-[2rem] border border-dashed border-slate-200">
+                      <Package className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                      <p className="text-sm font-bold text-slate-400">{t.noProducts}</p>
+                    </div>
+                  ) : (
+                    xoobayProducts.map((p) => (
+                      <div
+                        key={p.id}
+                        onClick={() => handleSelectProduct(p.id)}
+                        className={`group p-4 border-2 rounded-3xl cursor-pointer transition-all flex items-center gap-5 ${selectedProductId === p.id
+                            ? "border-blue-600 bg-blue-50/30 shadow-lg shadow-blue-50"
+                            : "border-slate-50 hover:border-slate-200 bg-white"
+                          }`}
+                      >
+                        <div className="relative">
+                          <img src={p.img_logo} className="w-14 h-14 rounded-2xl object-cover border border-slate-100 shadow-sm transition-transform group-hover:scale-105" alt={p.name} />
+                          {selectedProductId === p.id && (
+                            <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-1 rounded-full shadow-lg border-2 border-white ring-4 ring-blue-50">
+                              <CheckCircle2 className="w-3 h-3" />
                             </div>
                           )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Internal Info Box */}
-                  <div className="p-2.5 bg-primary-500/10 border border-primary-500/20 rounded-lg flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary-500/20 flex items-center justify-center text-primary-400 shrink-0">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                    </div>
-                    <p className="text-[10px] text-primary-400 leading-tight">
-                      <strong>Internal Mode Active:</strong> API routing and authentication are managed automatically.
-                    </p>
-                  </div>
-
-                  {/* Model Selection (Filtered by Provider) */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-1.5 font-medium">Model Variant</label>
-                    <div className="flex gap-2">
-                      <select
-                        value={settings.model}
-                        onChange={(e) => {
-                          if (e.target.value !== 'custom') {
-                            updateSettings({ model: e.target.value });
-                          }
-                        }}
-                        className="flex-1 px-3 py-2 bg-dark-800 border border-primary-500/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                      >
-                        {(PROVIDER_MODELS[settings.provider] || []).map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                        <option value="custom">-- Custom / Other --</option>
-                      </select>
-                      {(!(PROVIDER_MODELS[settings.provider] || []).includes(settings.model) || settings.model === 'custom') && (
-                        <input
-                          type="text"
-                          value={settings.model === 'custom' ? '' : settings.model}
-                          onChange={(e) => updateSettings({ model: e.target.value })}
-                          placeholder="Enter model name"
-                          className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                /* --- DIY MODE UI (Original Flow) --- */
-                <>
-                  <h4 className="text-xs font-semibold text-amber-500 flex items-center gap-2">
-                    🛠️ Manual API Configuration
-                  </h4>
-
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-1.5 uppercase tracking-wider">AI Provider</label>
-                    <select
-                      value={settings.provider}
-                      onChange={(e) => {
-                        const newProvider = e.target.value as any;
-                        const firstModel = PROVIDER_MODELS[newProvider]?.[0] || '';
-                        updateSettings({ provider: newProvider, model: firstModel });
-                      }}
-                      className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all hover:border-dark-600"
-                    >
-                      {PROVIDERS_LIST.map(p => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.company})</option>
-                      ))}
-                      {/* Backward compatibility for old providers not in grid */}
-                      {!PROVIDERS_LIST.find(p => p.id === settings.provider) && (
-                        <option value={settings.provider}>{settings.provider}</option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[10px] text-amber-400 leading-tight">
-                    Tip: Enter <strong>mock</strong> as API Key to test UI without consuming credits.
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="block text-xs text-dark-400 mb-1.5">API Key</label>
-              <input
-                type="password"
-                value={settings.apiKey}
-                onChange={(e) => updateSettings({ apiKey: e.target.value })}
-                placeholder="Enter your API key"
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-dark-400 mb-1.5">Base URL</label>
-              <input
-                type="text"
-                value={settings.baseUrl}
-                onChange={(e) => updateSettings({ baseUrl: e.target.value })}
-                        placeholder="https://api.openai.com/v1"
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              />
-            </div>
-                  </div>
-
-            <div>
-                    <label className="block text-xs text-dark-400 mb-1.5 font-medium uppercase tracking-wider">Target Model</label>
-                    <div className="flex gap-2">
-              <select
-                value={settings.model}
-                        onChange={(e) => {
-                          if (e.target.value !== 'custom') {
-                            updateSettings({ model: e.target.value });
-                          }
-                        }}
-                        className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-              >
-                        {AVAILABLE_MODELS.map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                        <option value="custom">-- Custom / Other --</option>
-              </select>
-                      {(settings.model === 'custom' || !AVAILABLE_MODELS.includes(settings.model)) && (
-                        <input
-                          type="text"
-                          value={settings.model === 'custom' ? '' : settings.model}
-                          onChange={(e) => updateSettings({ model: e.target.value })}
-                          placeholder="Enter model name"
-                          className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                        />
-                      )}
-            </div>
-                  </div>
-                </>
-              )}
-          </div>
-          
-          {/* Video AI Info */}
-          <div className="p-3 bg-purple-900/20 rounded-xl border border-purple-700/50">
-            <h4 className="text-xs font-semibold text-purple-400 flex items-center gap-2 mb-2">
-              🎬 Video Generation
-            </h4>
-            <p className="text-xs text-dark-400">
-              Video generation uses the same POE API key. Select a video model in Step 3 (Video Mode) to generate videos.
-            </p>
-            <p className="text-xs text-dark-500 mt-2">
-              Available video models: Sora, Veo, Runway, Kling, Hailuo, Pika, Luma
-            </p>
-          </div>
-
-            {/* Model Testing Section */}
-            <div className="p-3 bg-blue-900/20 rounded-xl border border-blue-700/50 space-y-3">
-              <h4 className="text-xs font-semibold text-blue-400 flex items-center gap-2">
-                🧪 Model Testing
-              </h4>
-              <p className="text-xs text-dark-400">
-                Test all configured models to verify API keys and connectivity.
-              </p>
-              <button
-                onClick={handleTestAllModels}
-                disabled={testingModels || settings.apiMode !== 'internal'}
-                className={`w-full px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-                  testingModels
-                    ? 'bg-blue-500/50 text-blue-300 cursor-not-allowed'
-                    : settings.apiMode !== 'internal'
-                    ? 'bg-dark-700 text-dark-500 cursor-not-allowed'
-                    : 'bg-blue-500 hover:bg-blue-600 text-white'
-                }`}
-              >
-                {testingModels ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Testing Models...
-                  </span>
-                ) : (
-                  '🚀 Test All Models'
-                )}
-              </button>
-
-              {settings.apiMode !== 'internal' && (
-                <p className="text-xs text-amber-400">
-                  ⚠️ Model testing is only available in Internal Mode. Switch to Internal Mode to test models.
-                </p>
-              )}
-
-              {/* Test Results */}
-              {Object.keys(testResults).length > 0 && (
-                <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
-                  <div className="text-xs text-dark-400 font-medium mb-2">Test Results:</div>
-                  {Object.entries(testResults).map(([displayName, result]) => (
-                    <div
-                      key={displayName}
-                      className={`p-2 rounded-lg border text-xs ${
-                        result.status === 'success'
-                          ? 'bg-emerald-900/20 border-emerald-700/50'
-                          : result.status === 'error'
-                          ? 'bg-red-900/20 border-red-700/50'
-                          : result.status === 'testing'
-                          ? 'bg-blue-900/20 border-blue-700/50'
-                          : 'bg-dark-800/50 border-dark-700/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-dark-300 truncate flex-1">{displayName}</span>
-                        <span
-                          className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            result.status === 'success'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : result.status === 'error'
-                              ? 'bg-red-500/20 text-red-400'
-                              : result.status === 'testing'
-                              ? 'bg-blue-500/20 text-blue-400'
-                              : 'bg-dark-700 text-dark-500'
-                          }`}
-                        >
-                          {result.status === 'success' ? '✓ Success' : result.status === 'error' ? '✗ Error' : result.status === 'testing' ? 'Testing...' : 'Pending'}
-                        </span>
-                      </div>
-                      {result.status === 'success' && result.response && (
-                        <p className="text-dark-400 mt-1 truncate" title={result.response}>
-                          {result.response}
-                        </p>
-                      )}
-                      {result.status === 'error' && result.message && (
-                        <p className="text-red-400 mt-1 text-[10px] truncate" title={result.message}>
-                          {result.message}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-        </div>
-      )}
-
-      {/* Progress Steps */}
-        <div className="px-3 py-2.5 lg:px-4 lg:py-3 border-b border-dark-800 flex gap-2 mb-4 overflow-x-auto">
-        {(['read', 'edit', 'config', 'result'] as Step[]).map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-              ${step === s ? 'bg-primary-500 text-white' : 
-                ['read', 'edit', 'config', 'result'].indexOf(step) > i ? 'bg-emerald-500 text-white' : 'bg-dark-700 text-dark-400'}`}>
-              {i + 1}
-            </div>
-            <span className={`text-xs ${step === s ? 'text-white' : 'text-dark-400'}`}>
-              {s === 'read' ? 'Read' : s === 'edit' ? 'Edit' : s === 'config' ? 'Config' : 'Result'}
-            </span>
-            {i < 3 && <div className="w-4 h-px bg-dark-700" />}
-          </div>
-        ))}
-      </div>
-
-        {/* Main Content - Responsive Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
-          {/* Step 1: Read Page - XOOBAY Products */}
-        {step === 'read' && (
-            <div className="lg:col-span-12">
-              <div className="flex flex-col space-y-4">
-                <div className="space-y-3 mb-4">
-                  {/* Language Selection */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-1.5">🌐 Language</label>
-                    <select
-                      value={xoobayLang}
-                      onChange={async (e) => {
-                        const newLang = e.target.value as XoobayLanguage;
-                        setXoobayLang(newLang);
-                        setSelectedProductId(null);
-                        // 自动刷新产品列表
-                        try {
-                          await searchProducts(
-                            {
-                              pageNo: 1,
-                              name: xoobaySearchTerm || undefined,
-                            },
-                            { lang: newLang }
-                          );
-                        } catch (error) {
-                          console.error('[App] Failed to refresh products after language change:', error);
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                    >
-                      <option value="zh_cn">中文</option>
-                      <option value="en">English</option>
-                      <option value="zh_hk">繁體中文</option>
-                      <option value="ru">Русский</option>
-                    </select>
-                  </div>
-
-                  {/* Search */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-1.5">🔍 Search Products</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={xoobaySearchTerm}
-                        onChange={(e) => setXoobaySearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleXoobaySearch()}
-                        placeholder="Product name (optional)"
-                        className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                      />
-                      <button
-                        onClick={handleXoobaySearch}
-                        disabled={xoobayLoading}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg disabled:opacity-50"
-                      >
-                        {xoobayLoading ? (
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                        ) : (
-                          'Search'
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Error Message */}
-                {xoobayError && (
-                  <div className="p-3 bg-red-900/30 border border-red-700/50 rounded-xl mb-3">
-                    <p className="text-red-400 text-sm">{xoobayError}</p>
-                  </div>
-                )}
-
-                {/* Product List */}
-                <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-                  {xoobayProducts.length === 0 && !xoobayLoading ? (
-                    <div className="text-center py-8 text-dark-400">
-                      <p className="text-sm">No products found</p>
-                      <p className="text-xs mt-1">Try searching or loading the first page</p>
-                    </div>
-                  ) : (
-                    xoobayProducts.map((product) => {
-                      const isSelected = selectedProductId === product.id;
-                      return (
-                      <div
-                        key={product.id}
-                          className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected
-                            ? 'bg-emerald-500/20 border-emerald-500'
-                            : 'bg-dark-800/50 border-dark-700 hover:border-dark-600'
-                        }`}
-                          onClick={() => {
-                            // 只设置选中状态，不加载和跳转
-                            setSelectedProductId(product.id);
-                          }}
-                      >
-                          <div className="flex gap-3 items-start">
-                          <img
-                            src={product.img_logo}
-                            alt={product.name}
-                              className="w-16 h-16 object-cover rounded-lg bg-dark-900 flex-shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect fill="%23334155" width="64" height="64"/><text x="32" y="32" text-anchor="middle" fill="%2394a3b8" font-size="10">No Image</text></svg>';
-                            }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white font-medium truncate">{product.name}</p>
-                            <p className="text-xs text-emerald-400 mt-1">${product.money}</p>
-                            <p className="text-xs text-dark-500 mt-1">ID: {product.id}</p>
-                          </div>
-                            </div>
                         </div>
-                      );
-                    })
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-slate-700 truncate group-hover:text-blue-600 transition-colors uppercase tracking-tight">{p.name}</p>
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <span className="text-[10px] text-blue-600 font-extrabold bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">${p.money}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Product ID: {p.id}</span>
+                          </div>
+                        </div>
+                        <ChevronRight className={`w-5 h-5 transition-all ${selectedProductId === p.id ? "text-blue-600 translate-x-1" : "text-slate-200 group-hover:text-slate-400"}`} />
+                      </div>
+                    ))
                   )}
                 </div>
+              </div>
 
-                {/* Pagination */}
-                {xoobayTotalPages > 1 && (
-                  <div className="flex items-center justify-between p-3 bg-dark-800/50 rounded-xl mb-4">
-                    <span className="text-xs text-dark-400">
-                      Page {xoobayPage} of {xoobayTotalPages}
+              {xoobayTotalPages > 1 && (
+                <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
+                  <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 shadow-sm">
+                    <button
+                      onClick={() => handleXoobaySearch()}
+                      disabled={xoobayPage === 1}
+                      className="p-2 hover:bg-white hover:text-blue-600 rounded-xl disabled:opacity-30 transition-all hover:shadow-sm"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-[10px] font-black text-slate-500 min-w-[3rem] text-center uppercase tracking-widest leading-none">
+                      {xoobayPage} <span className="text-slate-300">/</span> {xoobayTotalPages}
                     </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => searchProducts({ pageNo: Math.max(1, xoobayPage - 1), name: xoobaySearchTerm || undefined }, { lang: xoobayLang })}
-                        disabled={xoobayPage <= 1 || xoobayLoading}
-                        className="px-3 py-1 text-xs bg-dark-700 hover:bg-dark-600 text-dark-300 rounded-lg disabled:opacity-50"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={handleXoobayLoadMore}
-                        disabled={xoobayPage >= xoobayTotalPages || xoobayLoading}
-                        className="px-3 py-1 text-xs bg-dark-700 hover:bg-dark-600 text-dark-300 rounded-lg disabled:opacity-50"
-                      >
-                        Next
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => searchProducts({ pageNo: xoobayPage + 1, name: searchTerm }, { lang: lang === "zh" ? "zh_cn" : "en" })}
+                      disabled={xoobayPage === xoobayTotalPages}
+                      className="p-2 hover:bg-white hover:text-blue-600 rounded-xl disabled:opacity-30 transition-all hover:shadow-sm"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
-
-                {/* Load Product Button */}
-                <button
-                  onClick={handleReadPage}
-                  disabled={!selectedProductId || xoobayLoading}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {xoobayLoading ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Loading Product...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Load Selected Product
-                    </>
-                  )}
-                </button>
-                {!selectedProductId && (
-                  <p className="text-amber-400 text-xs mt-2 text-center">Please select a product first</p>
-                )}
-              </div>
-          </div>
-        )}
-
-        {/* Step 2: Edit Content */}
-        {step === 'edit' && pageContent && (
-            <div className="lg:col-span-12 min-h-[600px] flex flex-col">
-            {/* Tabs */}
-            <div className="flex gap-1 mb-3 bg-dark-800 rounded-lg p-1">
-              <button
-                onClick={() => setEditTab('text')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
-                  ${editTab === 'text' ? 'bg-primary-500 text-white' : 'text-dark-400 hover:text-white'}`}
-              >
-                📄 Text
-                <span className="text-xs opacity-70">({editedContent.length.toLocaleString()})</span>
-              </button>
-              <button
-                onClick={() => setEditTab('images')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
-                  ${editTab === 'images' ? 'bg-primary-500 text-white' : 'text-dark-400 hover:text-white'}`}
-              >
-                🖼️ Images
-                <span className="text-xs opacity-70">({selectedImages.length}/{pageContent.images.length})</span>
-              </button>
-            </div>
-
-            {/* Text Tab */}
-            {editTab === 'text' && (
-              <div className="flex-1 flex flex-col">
-                <textarea
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  className="flex-1 w-full p-3 bg-dark-800 border border-dark-700 rounded-xl text-sm text-dark-200 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                  placeholder="Edit the text content..."
-            />
-          </div>
-        )}
-
-            {/* Images Tab */}
-            {editTab === 'images' && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-dark-400">
-                    {selectedImages.length} of {pageContent.images.length} images selected
-                  </span>
-                  <div className="flex gap-2">
-                    <button onClick={handleSelectAllImages} className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg">Select All</button>
-                    <button onClick={handleDeselectAllImages} className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg">Deselect All</button>
-              </div>
-            </div>
-                
-                <div className="flex-1 overflow-y-auto">
-                  {pageContent.images.length === 0 ? (
-                    <div className="text-center py-8 text-dark-400">No images found on this page</div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {pageContent.images.map((img, index) => {
-                        const isSelected = selectedImages.some(i => i.src === img.src);
-                        return (
-                          <div
-                  key={index}
-                            onClick={() => handleToggleImage(index)}
-                            className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all
-                              ${isSelected ? 'border-primary-500 ring-2 ring-primary-500/30' : 'border-dark-700 hover:border-dark-600 opacity-50'}`}
-                          >
-                            <img src={img.src} alt={img.alt} className="w-full h-24 object-cover bg-dark-900"
-                              onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23334155" width="100" height="100"/><text x="50" y="50" text-anchor="middle" fill="%2394a3b8" font-size="12">Error</text></svg>'; }}
-                            />
-                            <div className="absolute top-2 right-2">
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isSelected ? 'bg-primary-500' : 'bg-dark-800/80'}`}>
-                                {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                              </div>
-                            </div>
-                            <div className="p-2 bg-dark-900/90">
-                              <p className="text-xs text-dark-300 truncate">{img.alt || 'No alt text'}</p>
-                              <p className="text-xs text-dark-500">{img.width}×{img.height}</p>
-                      </div>
-                    </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={jumpInputValue}
+                      onChange={(e) => setJumpInputValue(e.target.value)}
+                      className="w-16 px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-center outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all shadow-inner"
+                      placeholder="GO"
+                    />
+                    <button onClick={handlePageJump} className="px-5 py-2.5 bg-slate-900 text-white text-[10px] font-black rounded-xl uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                      {t.page_jump}
+                    </button>
                   </div>
                 </div>
               )}
-              
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setStep('read')} className="flex-1 px-4 py-2.5 bg-dark-800 text-dark-300 rounded-xl border border-dark-700 hover:bg-dark-700">Back</button>
-              <button onClick={handleConfirmContent} disabled={!editedContent.trim()} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-indigo-500 text-white font-medium rounded-xl disabled:opacity-50">Next: Config</button>
-            </div>
             </div>
           )}
 
-        {/* Step 3: AI Config */}
-        {step === 'config' && (
-            <div className="lg:col-span-12 min-h-[600px] flex flex-col">
-            {/* Mode Toggle */}
-            <div className="flex gap-1 mb-4 bg-dark-800 rounded-lg p-1">
-              <button
-                onClick={() => setConfigMode('text')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
-                  ${configMode === 'text' ? 'bg-primary-500 text-white' : 'text-dark-400 hover:text-white'}`}
-              >
-                📝 Text Generation
-              </button>
-              <button
-                onClick={() => setConfigMode('video')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors
-                  ${configMode === 'video' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-dark-400 hover:text-white'}`}
-              >
-                🎬 Video Prompt
-              </button>
-            </div>
-            
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">
-                {configMode === 'text' ? 'Text AI Configuration' : 'Video Prompt Configuration'}
-              </h3>
-              <button
-                onClick={handleResetConfig}
-                className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
-              >
-                Reset to Default
-              </button>
-            </div>
-            
-            {/* Text Generation Config */}
-            {configMode === 'text' && (
-              <>
-                {/* Quick Options */}
-                <div className="space-y-4 mb-4">
-                  {/* Output Language */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-2">🌐 Output Language</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {OUTPUT_LANGUAGES.slice(0, 6).map(lang => (
-                        <button
-                          key={lang.code}
-                          onClick={() => setAiConfig(c => ({ ...c, outputLanguage: lang.code }))}
-                          className={`px-3 py-2 text-xs rounded-lg transition-all
-                            ${aiConfig.outputLanguage === lang.code 
-                              ? 'bg-primary-500 text-white' 
-                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                        >
-                          {lang.label}
-                        </button>
-                      ))}
-                    </div>
-                    <select
-                      value={aiConfig.outputLanguage}
-                      onChange={(e) => setAiConfig(c => ({ ...c, outputLanguage: e.target.value }))}
-                      className="mt-2 w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-300 text-xs"
-                    >
-                      {OUTPUT_LANGUAGES.map(lang => <option key={lang.code} value={lang.code}>{lang.label}</option>)}
-                    </select>
+          {/* Step 2: Content Review */}
+          {step === 2 && (
+            <div className="p-8 lg:p-12 flex-1 flex flex-col animate-in slide-in-from-right-10 duration-500">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-emerald-600" />
                   </div>
-
-                  {/* Output Format */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-2">📄 Output Format</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {OUTPUT_FORMATS.map(fmt => (
-                        <button
-                          key={fmt.code}
-                          onClick={() => setAiConfig(c => ({ ...c, outputFormat: fmt.code }))}
-                          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
-                            ${aiConfig.outputFormat === fmt.code 
-                              ? 'bg-primary-500 text-white' 
-                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                        >
-                          <span>{fmt.icon}</span>
-                          <span className="text-xs">{fmt.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Reasoning Effort */}
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-2">🧠 Reasoning Effort</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {REASONING_LEVELS.map(level => (
-                        <button
-                          key={level.value}
-                          onClick={() => setAiConfig(c => ({ ...c, reasoningEffort: level.value as AIConfig['reasoningEffort'] }))}
-                          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
-                            ${aiConfig.reasoningEffort === level.value 
-                              ? 'bg-primary-500 text-white' 
-                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                        >
-                          <span className="text-sm font-medium">{level.label}</span>
-                          <span className="text-xs opacity-70">{level.description}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Web Search Toggle */}
-                  <div className="flex items-center justify-between p-3 bg-dark-800 rounded-xl">
-                    <div>
-                      <p className="text-sm text-white">🔍 Enable Web Search</p>
-                      <p className="text-xs text-dark-400">Allow AI to search the web for additional context</p>
-                    </div>
-                    <button
-                      onClick={() => setAiConfig(c => ({ ...c, enableWebSearch: !c.enableWebSearch }))}
-                      className={`w-12 h-6 rounded-full transition-colors relative
-                        ${aiConfig.enableWebSearch ? 'bg-primary-500' : 'bg-dark-700'}`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
-                        ${aiConfig.enableWebSearch ? 'translate-x-7' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tight">{t.editTitle}</h2>
                 </div>
-
-                {/* System Prompt Preview */}
-                <div className="flex-1 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs text-dark-400">📝 Generated System Prompt</label>
-                    <button
-                      onClick={() => setShowSystemPrompt(!showSystemPrompt)}
-                      className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
-                    >
-                      {showSystemPrompt ? 'Hide' : 'Preview'}
-                    </button>
-                  </div>
-                  
-                  {/* Config Summary Badge */}
-                  <div className="mb-2 px-3 py-1.5 bg-dark-800/50 rounded-lg border border-dark-700/50 inline-flex items-center gap-2 text-xs text-dark-300">
-                    <span className="text-dark-500">Active:</span>
-                    <span>{getConfigSummary()}</span>
-                  </div>
-                  
-                  {showSystemPrompt && (
-                    <div className="flex-1 overflow-y-auto p-3 bg-dark-800 border border-dark-700 rounded-xl text-xs text-dark-200 font-mono whitespace-pre-wrap">
-                      {finalSystemPrompt}
-                    </div>
-                  )}
-                  
-                  {!showSystemPrompt && (
-                    <div className="p-3 bg-dark-800/50 rounded-xl border border-dark-700/50">
-                      <p className="text-xs text-dark-400">
-                        System prompt generated ({finalSystemPrompt.length.toLocaleString()} characters)
-                      </p>
-                      <p className="text-xs text-dark-500 mt-1">
-                        Click "Preview" to view the full prompt with your settings integrated.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-            
-            {/* Video Prompt Config */}
-            {configMode === 'video' && (
-              <div className="flex-1 overflow-y-auto space-y-4">
-                {/* Video Model Selection */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">🎥 Video Model</label>
-                    <div className="flex gap-2">
-                  <select
-                        value={VIDEO_MODELS.some(m => m.name === videoConfig.model) ? videoConfig.model : 'custom'}
-                        onChange={(e) => {
-                          if (e.target.value !== 'custom') {
-                            handleVideoModelChange(e.target.value as VideoModel);
-                          } else {
-                            // If 'custom' is selected, clear the model name to prompt user input
-                            setVideoConfig(c => ({ ...c, model: '' as VideoModel }));
-                          }
-                        }}
-                        className="flex-1 px-3 py-2 bg-dark-800 border border-purple-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                  <button
+                    onClick={() => setEditTab("text")}
+                    className={`px-5 py-2 text-[10px] font-black uppercase rounded-xl transition-all flex items-center gap-2 ${editTab === "text" ? "bg-white text-blue-600 shadow-md ring-1 ring-slate-200" : "text-slate-400"
+                      }`}
                   >
-                    {VIDEO_MODELS.map(model => (
-                      <option key={model.name} value={model.name}>
-                            {model.displayName}
-                      </option>
-                    ))}
-                        <option value="custom">-- Custom Model --</option>
-                  </select>
-                      {(!VIDEO_MODELS.some(m => m.name === videoConfig.model) || videoConfig.model === ('custom' as any)) && (
-                        <input
-                          type="text"
-                          value={VIDEO_MODELS.some(m => m.name === videoConfig.model) ? '' : videoConfig.model}
-                          onChange={(e) => setVideoConfig(c => ({ ...c, model: e.target.value as any }))}
-                          placeholder="Model ID"
-                          className="flex-1 px-3 py-2 bg-dark-800 border border-purple-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                        />
-                      )}
-                    </div>
-                  {/* Model Info Card */}
-                  <div className="mt-2 p-3 bg-dark-800/50 rounded-lg border border-dark-700/50">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-white">{currentVideoModel.displayName}</span>
-                      <span className="text-xs text-purple-400">{currentVideoModel.provider}</span>
-                    </div>
-                    <p className="text-xs text-dark-400 mt-1">{currentVideoModel.description}</p>
-                    <div className="flex gap-2 mt-2">
-                      <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">{currentVideoModel.minDuration}-{currentVideoModel.maxDuration}s</span>
-                      <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">{currentVideoModel.defaultWidth}×{currentVideoModel.defaultHeight}</span>
-                      {currentVideoModel.supportsImageReference && <span className="text-xs px-2 py-0.5 bg-dark-700 rounded-full">🖼️ Image</span>}
-                      {currentVideoModel.supportsSoundGeneration && <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">🔊 Audio</span>}
+                    <Type className="w-3.5 h-3.5" /> {t.editTabContent}
+                  </button>
+                  <button
+                    onClick={() => setEditTab("images")}
+                    className={`px-5 py-2 text-[10px] font-black uppercase rounded-xl transition-all flex items-center gap-2 ${editTab === "images" ? "bg-white text-blue-600 shadow-md ring-1 ring-slate-200" : "text-slate-400"
+                      }`}
+                  >
+                    <Layout className="w-3.5 h-3.5" /> {t.editTabImages}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-[700px] flex flex-col">
+                {editTab === "text" ? (
+                  <div className="relative flex-1 group">
+                    <textarea
+                      value={editedContent}
+                      onChange={(e) => setEditedContent(e.target.value)}
+                      className="w-full h-full min-h-[700px] p-10 bg-slate-50 border border-slate-100 rounded-[2.5rem] text-base font-medium leading-loose outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all shadow-inner scrollbar-thin"
+                    />
+                    <div className="absolute top-6 right-6 p-2 bg-white/80 backdrop-blur-md rounded-xl border border-slate-100 shadow-sm pointer-events-none text-[9px] font-black text-slate-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                      Rich Editor
                     </div>
                   </div>
-                </div>
-                
-                {/* Duration Slider */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">⏱️ Duration: {videoConfig.duration}s</label>
-                  <input
-                    type="range"
-                    min={currentVideoModel.minDuration}
-                    max={currentVideoModel.maxDuration}
-                    step={currentVideoModel.durationStep}
-                    value={videoConfig.duration}
-                    onChange={(e) => setVideoConfig(c => ({ ...c, duration: Number(e.target.value) }))}
-                    className="w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                  />
-                  <div className="flex justify-between text-xs text-dark-500 mt-1">
-                    <span>{currentVideoModel.minDuration}s</span>
-                    <span>{currentVideoModel.maxDuration}s</span>
-                  </div>
-                </div>
-                
-                {/* Video Dimensions */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">📐 Video Size ({videoConfig.width}×{videoConfig.height})</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { w: 1280, h: 720, label: '720p 16:9' },
-                      { w: 720, h: 1280, label: '720p 9:16' },
-                      { w: 1920, h: 1080, label: '1080p 16:9' },
-                      { w: 1080, h: 1920, label: '1080p 9:16' },
-                      { w: 1080, h: 1080, label: '1080p 1:1' },
-                      { w: 720, h: 720, label: '720p 1:1' },
-                    ].map(size => {
-                      const isSelected = videoConfig.width === size.w && videoConfig.height === size.h;
+                ) : (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    {pageContent?.images?.map((img, idx) => {
+                      const isSelected = selectedImages.some(i => i.src === img.src);
                       return (
-                        <button
-                          key={`${size.w}x${size.h}`}
-                          onClick={() => setVideoConfig(c => ({ ...c, width: size.w, height: size.h }))}
-                          className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-all text-xs
-                            ${isSelected 
-                              ? 'bg-purple-500 text-white' 
-                              : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setSelectedImages(prev => isSelected ? prev.filter(i => i.src !== img.src) : [...prev, img]);
+                          }}
+                          className={`group relative aspect-square rounded-[2rem] overflow-hidden border-4 transition-all cursor-pointer ${isSelected ? "border-blue-600 shadow-xl shadow-blue-100 scale-[0.98]" : "border-slate-50 hover:border-slate-200"
+                            }`}
                         >
-                          <div className={`border-2 ${isSelected ? 'border-white' : 'border-dark-500'} rounded
-                            ${size.w > size.h ? 'w-5 h-3' : size.w < size.h ? 'w-3 h-5' : 'w-4 h-4'}`} />
-                          <span>{size.label}</span>
+                          <img src={img.src} alt={img.alt} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" title={img.alt} />
+                          <div className={`absolute inset-0 bg-blue-600/10 transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
+                          {isSelected && (
+                            <div className="absolute top-4 right-4 bg-blue-600 text-white p-2 rounded-2xl shadow-xl ring-4 ring-blue-50">
+                              <CheckCircle2 className="w-4 h-4" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Strategy Config */}
+          {step === 3 && (
+            <div className="p-8 lg:p-12 flex-1 animate-in slide-in-from-right-10 duration-500 overflow-y-auto scrollbar-thin">
+              <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tight">{t.configTitle}</h2>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50/50 rounded-2xl border border-blue-100 shadow-sm animate-pulse">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full" />
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                    {settings.apiMode === "internal" ? t.enterpriseMode : t.diyMode}
+                  </span>
+                </div>
+              </div>
+
+              {/* 文本/视频模式切换 */}
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 mb-8">
+                <button
+                  onClick={() => setGenerationMode("text")}
+                  className={`flex-1 px-6 py-3 text-sm font-black uppercase rounded-xl transition-all flex items-center justify-center gap-2 ${generationMode === "text" ? "bg-white text-blue-600 shadow-md ring-1 ring-slate-200" : "text-slate-400"
+                    }`}
+                >
+                  <Type className="w-4 h-4" /> 文本生成
+                </button>
+                <button
+                  onClick={() => setGenerationMode("video")}
+                  className={`flex-1 px-6 py-3 text-sm font-black uppercase rounded-xl transition-all flex items-center justify-center gap-2 ${generationMode === "video" ? "bg-white text-blue-600 shadow-md ring-1 ring-slate-200" : "text-slate-400"
+                    }`}
+                >
+                  <Film className="w-4 h-4" /> 视频生成
+                </button>
+              </div>
+
+              {/* 文本生成配置 */}
+              {generationMode === "text" && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                        <Languages className="w-3.5 h-3.5" /> {t.targetLanguage}
+                      </label>
+                      <div className="relative group">
+                        <select
+                          value={aiConfig.outputLanguage}
+                          onChange={(e) => setAiConfig(prev => ({ ...prev, outputLanguage: e.target.value }))}
+                          className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-base font-bold shadow-inner outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all appearance-none cursor-pointer"
+                        >
+                          {OUTPUT_LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-hover:text-blue-500 transition-colors w-4 h-4" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                        <Layout className="w-3.5 h-3.5" /> {t.outputFormat}
+                      </label>
+                      <div className="relative group">
+                        <select
+                          value={aiConfig.outputFormat}
+                          onChange={(e) => setAiConfig(prev => ({ ...prev, outputFormat: e.target.value }))}
+                          className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-base font-bold shadow-inner outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all appearance-none cursor-pointer"
+                        >
+                          {OUTPUT_FORMATS.map(f => <option key={f.code} value={f.code}>{f.label}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-hover:text-blue-500 transition-colors w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-3 text-[11px] font-black text-slate-900 bg-slate-100 px-6 py-3 rounded-2xl hover:bg-slate-200 transition-all active:scale-95 border border-slate-200 uppercase tracking-widest"
+                  >
+                    {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    {t.advancedMode}
+                  </button>
+
+                  {showAdvanced && (
+                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 shadow-inner animate-in slide-in-from-top-4 duration-500">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between px-2">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-slate-700 uppercase tracking-tight">{t.webSearch}</span>
+                            <span className="text-[10px] text-slate-400 font-medium">通过互联网实时增强内容深度</span>
+                          </div>
+                          <button
+                            onClick={() => setAiConfig(prev => ({ ...prev, enableWebSearch: !prev.enableWebSearch }))}
+                            className={`w-14 h-8 rounded-full relative transition-all shadow-sm ${aiConfig.enableWebSearch ? "bg-emerald-500 shadow-emerald-200" : "bg-slate-300"}`}
+                          >
+                            <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-lg transition-all ${aiConfig.enableWebSearch ? "left-7 shadow-emerald-600/20" : "left-1"}`} />
+                          </button>
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{t.reasoningEffort}</label>
+                          <div className="flex bg-slate-200/50 p-1.5 rounded-[1.5rem] border border-slate-200">
+                            {["low", "medium", "high"].map(v => (
+                              <button
+                                key={v}
+                                onClick={() => setAiConfig(prev => ({ ...prev, reasoningEffort: v as "low" | "medium" | "high" }))}
+                                className={`flex-1 py-3 text-[10px] font-black uppercase rounded-2xl transition-all ${aiConfig.reasoningEffort === v ? "bg-white text-blue-600 shadow-xl ring-1 ring-slate-200" : "text-slate-400 hover:text-slate-600"
+                                  }`}
+                              >
+                                {(t as any)[v]}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white/60 p-6 rounded-3xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                        <ShieldCheck className="w-10 h-10 text-blue-100 mb-3" />
+                        <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">
+                          Powered by <span className="text-blue-600">Enterprise Engine</span><br />
+                          SLA Guaranteed
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* 视频生成配置 */}
+              {generationMode === "video" && (
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* 视频模型选择 */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                        <Film className="w-3.5 h-3.5" /> 视频模型
+                      </label>
+                      <div className="relative group">
+                        <select
+                          value={videoConfig.model}
+                          onChange={(e) => setVideoConfig(prev => ({ ...prev, model: e.target.value as any }))}
+                          className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-base font-bold shadow-inner outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all appearance-none cursor-pointer"
+                        >
+                          {VIDEO_MODELS.map(m => <option key={m.name} value={m.name}>{m.displayName}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-hover:text-blue-500 transition-colors w-4 h-4" />
+                      </div>
+                    </div>
+
+                    {/* 目标语言 */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                        <Languages className="w-3.5 h-3.5" /> 目标语言
+                      </label>
+                      <div className="relative group">
+                        <select
+                          value={videoConfig.targetLanguage}
+                          onChange={(e) => setVideoConfig(prev => ({ ...prev, targetLanguage: e.target.value as any }))}
+                          className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-base font-bold shadow-inner outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all appearance-none cursor-pointer"
+                        >
+                          {VIDEO_OUTPUT_LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-hover:text-blue-500 transition-colors w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 视频风格选择 */}
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">视频风格</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {VIDEO_STYLES.map(style => (
+                        <button
+                          key={style.code}
+                          onClick={() => setVideoConfig(prev => ({ ...prev, videoStyle: style.code as any }))}
+                          className={`p-6 rounded-3xl border-2 transition-all text-left ${
+                            videoConfig.videoStyle === style.code
+                              ? "border-blue-600 bg-blue-50/30 shadow-lg shadow-blue-50"
+                              : "border-slate-100 bg-white hover:border-slate-200"
+                          }`}
+                        >
+                          <div className="text-3xl mb-3">{style.icon}</div>
+                          <div className="text-sm font-black text-slate-800 mb-1">{style.label}</div>
+                          <div className="text-[10px] text-slate-400 font-medium leading-relaxed">{style.description}</div>
                         </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 4: Gen Result */}
+          {step === 4 && (
+            <div className="p-8 lg:p-12 flex-1 flex flex-col animate-in scale-in-95 duration-500">
+              <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+                    (aiLoading || videoPolling) ? "bg-blue-600 animate-pulse text-white" : 
+                    (aiResult || (videoResult && videoResult.status === 'completed')) ? "bg-emerald-500 text-white" : 
+                    "bg-red-500 text-white"
+                  }`}>
+                    {(aiLoading || videoPolling) ? <RefreshCw className="w-5 h-5 animate-spin" /> : 
+                     (aiResult || (videoResult && videoResult.status === 'completed')) ? <CheckCircle2 className="w-5 h-5" /> :
+                     <AlertCircle className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-black text-slate-800 tracking-tight">
+                      {generationMode === "text" ? (
+                        aiLoading ? t.generating : "Content Optimized"
+                      ) : (
+                        videoPolling ? "视频生成中..." : 
+                        videoResult?.status === 'completed' ? "视频生成完成" :
+                        videoResult?.status === 'failed' ? "视频生成失败" :
+                        aiLoading ? "准备生成视频..." : "视频生成"
+                      )}
+                    </h2>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-2">
+                      {generationMode === "text" ? (
+                        aiLoading ? "Deep Neural processing..." : "Ready for deployment"
+                      ) : (
+                        videoPolling ? `Processing... ${videoResult?.progress || 0}%` :
+                        videoResult?.status === 'completed' ? "Ready to download" :
+                        videoResult?.status === 'failed' ? "Please try again" :
+                        "Preparing video generation"
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 文本结果操作按钮 */}
+                {generationMode === "text" && !aiLoading && !aiError && aiResult && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        const blob = new Blob([aiResult], { type: "text/markdown" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `SEO_Content_${Date.now()}.md`;
+                        a.click();
+                      }}
+                      className="px-6 py-3 bg-slate-900 font-black text-white rounded-2xl text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl active:scale-95"
+                    >
+                      <DownloadCloud className="w-4 h-4" /> {t.download}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(aiResult);
+                        window.alert("Copied!");
+                      }}
+                      className="p-3 bg-slate-100 text-slate-500 rounded-2xl border border-slate-200 hover:text-blue-600 hover:bg-white transition-all shadow-sm"
+                    >
+                      <Copy className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* 视频结果操作按钮 */}
+                {generationMode === "video" && videoResult?.status === 'completed' && videoResult.videoUrl && (
+                  <div className="flex gap-3">
+                    <a
+                      href={videoResult.videoUrl}
+                      download={`Video_${Date.now()}.mp4`}
+                      className="px-6 py-3 bg-slate-900 font-black text-white rounded-2xl text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl active:scale-95"
+                    >
+                      <DownloadCloud className="w-4 h-4" /> 下载视频
+                    </a>
+                    <button
+                      onClick={() => {
+                        if (videoResult.prompt) {
+                          navigator.clipboard.writeText(videoResult.prompt);
+                          window.alert("视频提示词已复制!");
+                        }
+                      }}
+                      className="p-3 bg-slate-100 text-slate-500 rounded-2xl border border-slate-200 hover:text-blue-600 hover:bg-white transition-all shadow-sm"
+                      title="复制视频提示词"
+                    >
+                      <Copy className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 min-h-[700px] flex flex-col">
+                {/* 文本生成结果 */}
+                {generationMode === "text" && (
+                  <>
+                    {aiError ? (
+                      <div className="p-8 bg-red-50 rounded-[2.5rem] border border-red-100 flex flex-col items-center justify-center text-center animate-in shake duration-500">
+                        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+                        <h3 className="text-lg font-black text-red-700 uppercase">{t.testError}</h3>
+                        <p className="text-sm text-red-600/80 font-medium mt-2 max-w-sm">{aiError}</p>
+                        <button onClick={handleGenerate} className="mt-8 px-8 py-4 bg-red-600 text-white rounded-3xl text-xs font-black shadow-lg shadow-red-200 flex items-center gap-2">
+                          <RefreshCw className="w-4 h-4" /> 重新生成
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="relative flex-1 group">
+                        <div className="absolute inset-0 p-1 bg-gradient-to-br from-blue-500/10 to-emerald-500/10 rounded-[3rem] -z-10 blur-2xl opacity-50" />
+                        <div className="w-full h-full p-10 bg-white/60 backdrop-blur-xl border border-white/40 rounded-[2.5rem] shadow-2xl overflow-y-auto scrollbar-thin">
+                          {aiLoading && !aiResult ? (
+                            <div className="space-y-6 opacity-30 animate-pulse">
+                              {[1, 2, 3, 4, 5].map(i => (
+                                <div key={i} className={`h-4 bg-slate-300 rounded-full ${i % 2 === 0 ? "w-3/4" : "w-full"}`} />
+                              ))}
+                            </div>
+                          ) : (
+                            renderResult(aiResult || "", aiConfig.outputFormat)
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* 视频生成结果 */}
+                {generationMode === "video" && (
+                  <>
+                    {videoResult?.status === 'failed' || (aiError && !videoResult) ? (
+                      <div className="p-8 bg-red-50 rounded-[2.5rem] border border-red-100 flex flex-col items-center justify-center text-center animate-in shake duration-500">
+                        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+                        <h3 className="text-lg font-black text-red-700 uppercase">视频生成失败</h3>
+                        <p className="text-sm text-red-600/80 font-medium mt-2 max-w-sm">
+                          {videoResult?.error || aiError || "视频生成过程中出现错误"}
+                        </p>
+                        {videoResult?.prompt && (
+                          <div className="mt-4 p-4 bg-white rounded-2xl border border-red-200 max-w-lg">
+                            <p className="text-xs text-slate-600 font-medium">生成的提示词：</p>
+                            <p className="text-sm text-slate-800 mt-2 leading-relaxed">{videoResult.prompt}</p>
+                          </div>
+                        )}
+                        <button onClick={handleGenerate} className="mt-8 px-8 py-4 bg-red-600 text-white rounded-3xl text-xs font-black shadow-lg shadow-red-200 flex items-center gap-2">
+                          <RefreshCw className="w-4 h-4" /> 重新生成
+                        </button>
+                      </div>
+                    ) : videoResult?.status === 'completed' && videoResult.videoUrl ? (
+                      <div className="relative flex-1 group">
+                        <div className="absolute inset-0 p-1 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-[3rem] -z-10 blur-2xl opacity-50" />
+                        <div className="w-full h-full p-10 bg-white/60 backdrop-blur-xl border border-white/40 rounded-[2.5rem] shadow-2xl flex flex-col gap-6">
+                          {/* 视频播放器 */}
+                          <div className="relative rounded-3xl overflow-hidden bg-black shadow-2xl">
+                            <video
+                              src={videoResult.videoUrl}
+                              controls
+                              className="w-full h-auto"
+                              style={{ maxHeight: '600px' }}
+                            >
+                              您的浏览器不支持视频播放
+                            </video>
+                          </div>
+
+                          {/* 视频信息 */}
+                          {videoResult.prompt && (
+                            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Film className="w-4 h-4 text-purple-600" />
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">视频提示词</h4>
+                              </div>
+                              <p className="text-sm text-slate-600 leading-relaxed">{videoResult.prompt}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative flex-1 flex items-center justify-center">
+                        <div className="text-center space-y-6">
+                          {/* 轮询进度 */}
+                          {videoPolling && (
+                            <>
+                              <div className="relative w-32 h-32 mx-auto">
+                                <svg className="w-32 h-32 transform -rotate-90">
+                                  <circle
+                                    cx="64"
+                                    cy="64"
+                                    r="56"
+                                    stroke="currentColor"
+                                    strokeWidth="8"
+                                    fill="none"
+                                    className="text-slate-200"
+                                  />
+                                  <circle
+                                    cx="64"
+                                    cy="64"
+                                    r="56"
+                                    stroke="currentColor"
+                                    strokeWidth="8"
+                                    fill="none"
+                                    strokeDasharray={`${2 * Math.PI * 56}`}
+                                    strokeDashoffset={`${2 * Math.PI * 56 * (1 - (videoResult?.progress || 0) / 100)}`}
+                                    className="text-blue-600 transition-all duration-500"
+                                    strokeLinecap="round"
+                                  />
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-2xl font-black text-slate-800">{videoResult?.progress || 0}%</span>
+                                </div>
+                              </div>
+                              <p className="text-base font-bold text-slate-600">视频生成中，请稍候...</p>
+                              <p className="text-sm text-slate-400">这可能需要几分钟时间</p>
+                            </>
+                          )}
+
+                          {/* 初始加载 */}
+                          {aiLoading && !videoPolling && !videoResult && (
+                            <>
+                              <RefreshCw className="w-16 h-16 text-blue-600 animate-spin mx-auto" />
+                              <p className="text-base font-bold text-slate-600">正在准备视频生成...</p>
+                            </>
+                          )}
+
+                          {/* 显示生成的提示词（pending状态） */}
+                          {videoResult?.prompt && videoResult.status === 'pending' && (
+                            <div className="mt-6 p-6 bg-blue-50 rounded-3xl border border-blue-100 max-w-2xl mx-auto">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Film className="w-4 h-4 text-blue-600" />
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">生成的视频提示词</h4>
+                              </div>
+                              <p className="text-sm text-slate-600 leading-relaxed">{videoResult.prompt}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {!aiLoading && (
+                <div className="mt-10 flex justify-center">
+                  <button onClick={handleRestart} className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">
+                    <RefreshCw className="w-4 h-4" /> {t.btn_restart}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Footer Controls */}
+          {step < 4 && (
+            <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between">
+              <button
+                onClick={() => setStep(prev => prev - 1)}
+                disabled={step === 1 || aiLoading}
+                className={`text-xs font-black uppercase px-8 py-3 rounded-2xl transition-all ${step === 1 ? "opacity-0 pointer-events-none" : "text-slate-400 hover:bg-slate-50 border border-transparent hover:border-slate-100"
+                  }`}
+              >
+                {t.btn_prev}
+              </button>
+              <button
+                onClick={handleNext}
+                disabled={aiLoading || (step === 1 && !selectedProductId)}
+                className="bg-slate-900 text-white px-12 py-5 rounded-3xl text-xs font-black shadow-2xl shadow-slate-200 hover:bg-blue-600 hover:shadow-blue-200 flex items-center gap-3 transition-all active:scale-95 disabled:opacity-30 disabled:shadow-none"
+              >
+                {step === 3 ? (
+                  <>{t.btn_generate} <Zap className="w-4 h-4 fill-current animate-bounce" /></>
+                ) : (
+                  <>{t.btn_next} <ChevronRight className="w-5 h-5" /></>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* --- MODALS --- */}
+
+      {/* Account Modal */}
+      {modal === "account" && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-10 relative animate-in zoom-in-95 duration-300">
+            <button onClick={() => setModal(null)} className="absolute top-8 right-8 p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-2xl transition-all"><X className="w-6 h-6" /></button>
+            <div className="flex flex-col items-center mb-10 text-center">
+              <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] border-8 border-white shadow-2xl shadow-slate-100 flex items-center justify-center mb-6 relative">
+                <UserIcon className="w-10 h-10 text-slate-300" />
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-2xl border-4 border-white shadow-lg" />
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight uppercase">DEMO USER</h3>
+              <p className="text-[10px] text-slate-400 mt-2 font-black uppercase tracking-widest flex items-center gap-2">
+                <Mail className="w-3.5 h-3.5" /> support@example.com
+              </p>
+            </div>
+            <div className="bg-slate-50/80 rounded-[2rem] p-8 border border-slate-100 mb-8 shadow-inner">
+              <div className="flex justify-between items-center mb-6">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest underline decoration-blue-500 decoration-2 underline-offset-4">Current Plan</span>
+                <span className="px-4 py-1.5 bg-blue-600 text-white rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">PRO PLAN</span>
+              </div>
+              <div className="space-y-5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-tight">Available Credits</span>
+                  <span className="text-sm font-black text-slate-800">{(settings?.usageLimit || 0) - (settings?.usageCount || 0)} <span className="text-slate-300 text-[10px]">PTS</span></span>
+                </div>
+                <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner ring-4 ring-slate-50/50">
+                  <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg" style={{ width: `${((settings?.usageLimit || 1) - (settings?.usageCount || 0)) / (settings?.usageLimit || 1) * 100}%` }} />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <button className="flex items-center justify-center gap-2 py-4 border-2 border-slate-100 rounded-2xl text-[10px] font-black text-slate-500 hover:bg-slate-50 hover:border-slate-200 transition-all active:scale-95 uppercase tracking-widest shadow-sm"><History className="w-4 h-4" /> Records</button>
+              <button className="flex items-center justify-center gap-2 py-4 border-2 border-slate-100 rounded-2xl text-[10px] font-black text-red-500 hover:bg-red-50 hover:border-red-100 transition-all active:scale-95 uppercase tracking-widest shadow-sm"><LogOut className="w-4 h-4" /> Log out</button>
+            </div>
+            <button onClick={() => setModal("upgrade")} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black shadow-2xl hover:bg-blue-600 transition-all active:scale-95 uppercase tracking-[0.2em]">Buy More Power</button>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Modal */}
+      {modal === "upgrade" && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[3.5rem] shadow-2xl p-12 relative animate-in zoom-in-95 duration-300">
+            <button onClick={() => setModal(null)} className="absolute top-10 right-10 p-3 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-all text-2xl font-light">&times;</button>
+            <div className="text-center mb-12">
+              <h3 className="text-3xl font-black text-slate-800 tracking-tight uppercase">Elevate your SEO power</h3>
+              <p className="text-slate-400 text-sm font-medium mt-2">Unlock unlimited generations and priority processing</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="p-10 border-4 border-slate-100 rounded-[3rem] hover:border-blue-100 transition-all group bg-white shadow-xl hover:shadow-2xl hover:-translate-y-1 duration-500">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Professional Monthly</div>
+                <div className="text-5xl font-black text-slate-900 mb-2">$29<span className="text-sm font-medium text-slate-400">/mo</span></div>
+                <div className="h-px bg-slate-100 my-6" />
+                <ul className="space-y-4 mb-10 text-[11px] font-bold text-slate-500 uppercase tracking-tight">
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Unlimited generations</li>
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> All premium models</li>
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Priority 24/7 Support</li>
+                </ul>
+                <button className="w-full py-5 bg-slate-100 rounded-[1.5rem] text-[10px] font-black text-slate-500 group-hover:bg-slate-900 group-hover:text-white transition-all uppercase tracking-widest">Subscribe Now</button>
+              </div>
+              <div className="p-10 border-4 border-blue-600 bg-blue-50/30 rounded-[3rem] relative shadow-2xl shadow-blue-100 hover:-translate-y-1 duration-500">
+                <div className="absolute top-0 right-10 bg-blue-600 text-white text-[10px] font-black px-6 py-2 rounded-b-[1rem] uppercase tracking-[0.2em] shadow-lg">Hot Seller</div>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">Credits Refill</div>
+                <div className="text-5xl font-black text-slate-900 mb-2">$9<span className="text-sm font-medium text-slate-400">/50 PTS</span></div>
+                <div className="h-px bg-blue-100 my-6" />
+                <ul className="space-y-4 mb-10 text-[11px] font-bold text-slate-600 uppercase tracking-tight">
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-blue-500" /> Fixed cost, no expiry</li>
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-blue-500" /> Pay-as-you-go model</li>
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-blue-500" /> Use premium credits anytime</li>
+                </ul>
+                <button className="w-full py-5 bg-blue-600 text-white rounded-[1.5rem] text-[10px] font-black shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all uppercase tracking-widest">Buy Refill Pack</button>
+              </div>
+            </div>
+            <p className="text-center mt-10 text-[10px] font-medium text-slate-400 flex items-center justify-center gap-2">
+              <ShieldCheck className="w-3.5 h-3.5" /> Secure Checkout by Stripe &bull; 7-day money back guarantee
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {modal === "settings" && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl p-10 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
+            <div className="flex justify-between items-center mb-10">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center">
+                  <SettingsIcon className="w-5 h-5 text-slate-700" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight uppercase">{t.system_config}</h3>
+              </div>
+              <button onClick={() => setModal(null)} className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-2xl">&times;</button>
+            </div>
+
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Engine Mode Selection</label>
+                <div className="flex p-2 bg-slate-100 rounded-[1.5rem] border border-slate-200 shadow-inner">
+                  <button
+                    onClick={() => updateSettings({ apiMode: "internal" })}
+                    className={`flex-1 py-4 text-[10px] font-black uppercase rounded-2xl transition-all ${settings.apiMode === "internal" ? "bg-white text-blue-600 shadow-xl ring-1 ring-slate-200" : "text-slate-400"
+                      }`}
+                  >
+                    {t.enterpriseMode}
+                  </button>
+                  <button
+                    onClick={() => updateSettings({ apiMode: "custom" })}
+                    className={`flex-1 py-4 text-[10px] font-black uppercase rounded-2xl transition-all ${settings.apiMode === "custom" ? "bg-white text-blue-600 shadow-xl ring-1 ring-slate-200" : "text-slate-400"
+                      }`}
+                  >
+                    {t.diyMode}
+                  </button>
+                </div>
+              </div>
+
+              {settings.apiMode === "custom" ? (
+                <div className="space-y-5 animate-in slide-in-from-bottom-5 duration-500">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 tracking-widest ml-2">
+                      <Server className="w-3.5 h-3.5" /> API Base URL
+                    </label>
+                    <input
+                      value={settings.baseUrl}
+                      onChange={(e) => updateSettings({ baseUrl: e.target.value })}
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all shadow-inner"
+                      placeholder="https://api.openai.com/v1"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 tracking-widest ml-2">
+                      <KeyIcon className="w-3.5 h-3.5" /> Secret API Key
+                    </label>
+                    <div className="relative group">
+                      <input
+                        type="password"
+                        value={settings.apiKey}
+                        onChange={(e) => updateSettings({ apiKey: e.target.value })}
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all shadow-inner"
+                        placeholder="sk-..."
+                      />
+                      <ShieldCheck className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-200 group-focus-within:text-blue-500 transition-colors w-5 h-5" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 shadow-inner">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                      <Activity className="w-5 h-5 text-blue-600" />
+                      <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{t.modelTesting}</span>
+                    </div>
+                    <button
+                      onClick={handleTestAllModels}
+                      disabled={testingModels}
+                      className="text-[10px] font-black text-blue-600 hover:text-blue-700 underline decoration-2 underline-offset-4 disabled:opacity-30 uppercase tracking-widest"
+                    >
+                      {testingModels ? t.testTesting : t.runTest}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {PROVIDERS_LIST.map((provider) => {
+                      const res = testResults[provider.id];
+                      const isTesting = res?.status === "testing";
+                      const isSuccess = res?.status === "success";
+                      const isError = res?.status === "error";
+
+                      return (
+                        <div
+                          key={provider.id}
+                          className={`p-3 rounded-2xl border transition-all flex flex-col items-center gap-2 ${isTesting ? "bg-slate-100 animate-pulse border-transparent" :
+                              isSuccess ? "bg-emerald-50 border-emerald-100 shadow-lg shadow-emerald-500/20" :
+                                isError ? "bg-red-50 border-red-100" : "bg-white border-slate-100"
+                            }`}
+                        >
+                          <span className="text-lg grayscale-0 filter brightness-110">{provider.icon}</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 truncate w-full text-center">{provider.name}</span>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <div className={`w-2 h-2 rounded-full ${isSuccess ? "bg-emerald-500" : isError ? "bg-red-500" : "bg-slate-300"}`} />
+                            <span className={`text-[8px] font-black uppercase ${isSuccess ? "text-emerald-600" : isError ? "text-red-600" : "text-slate-400"}`}>
+                              {isSuccess ? t.activeStatus : isError ? t.offlineStatus : isTesting ? t.testingStatus : "Wait"}
+                            </span>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
                 </div>
-                
-                {/* Video Style */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">🎨 Video Style</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {VIDEO_STYLES.map(style => (
-                      <button
-                        key={style.code}
-                        onClick={() => setVideoConfig(c => ({ ...c, videoStyle: style.code as VideoConfig['videoStyle'] }))}
-                        className={`flex flex-col items-start p-3 rounded-xl transition-all text-left
-                          ${videoConfig.videoStyle === style.code 
-                            ? 'bg-purple-500/20 border-2 border-purple-500' 
-                            : 'bg-dark-800 border-2 border-dark-700 hover:border-dark-600'}`}
-                      >
-                        <span className="text-base">{style.icon} {style.label}</span>
-                        <span className="text-xs text-dark-400 mt-1">{style.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Target Language */}
-                <div>
-                  <label className="block text-xs text-dark-400 mb-2">🌐 On-screen Text Language</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {VIDEO_OUTPUT_LANGUAGES.map(lang => (
-                      <button
-                        key={lang.code}
-                        onClick={() => setVideoConfig(c => ({ ...c, targetLanguage: lang.code as VideoConfig['targetLanguage'] }))}
-                        className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
-                          ${videoConfig.targetLanguage === lang.code 
-                            ? 'bg-purple-500 text-white' 
-                            : 'bg-dark-800 text-dark-300 hover:bg-dark-700'}`}
-                      >
-                        <span>{lang.flag}</span>
-                        <span className="text-xs">{lang.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Brand Settings */}
-                <div className="p-3 bg-dark-800 rounded-xl space-y-3">
-                  <label className="block text-xs text-dark-400">🏷️ Brand Settings</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-dark-500 mb-1">Brand Name</label>
-                      <input
-                        type="text"
-                        value={videoConfig.brandName}
-                        onChange={(e) => setVideoConfig(c => ({ ...c, brandName: e.target.value }))}
-                        className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                        placeholder="XOOBAY"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-dark-500 mb-1">Brand URL</label>
-                      <input
-                        type="text"
-                        value={videoConfig.brandUrl}
-                        onChange={(e) => setVideoConfig(c => ({ ...c, brandUrl: e.target.value }))}
-                        className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                        placeholder="https://www.xoobay.com/"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Sound Toggle */}
-                {currentVideoModel.supportsSoundGeneration && (
-                  <div className="flex items-center justify-between p-3 bg-dark-800 rounded-xl">
-                    <div>
-                      <p className="text-sm text-white">🔊 Generate Audio</p>
-                      <p className="text-xs text-dark-400">Include ambient sounds and effects</p>
-                    </div>
-                    <button
-                      onClick={() => setVideoConfig(c => ({ ...c, enableSound: !c.enableSound }))}
-                      className={`w-12 h-6 rounded-full transition-colors relative
-                        ${videoConfig.enableSound ? 'bg-purple-500' : 'bg-dark-700'}`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
-                        ${videoConfig.enableSound ? 'translate-x-7' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                )}
-                
-                {/* Image Reference Toggle */}
-                {currentVideoModel.supportsImageReference && (
-                  <div className="p-3 bg-dark-800 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-white">🖼️ Use Image Reference</p>
-                        <p className="text-xs text-dark-400">Provide a product image as reference</p>
-                      </div>
-                      <button
-                        onClick={() => setVideoConfig(c => ({ ...c, useImageReference: !c.useImageReference }))}
-                        className={`w-12 h-6 rounded-full transition-colors relative
-                          ${videoConfig.useImageReference ? 'bg-purple-500' : 'bg-dark-700'}`}
-                      >
-                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
-                          ${videoConfig.useImageReference ? 'translate-x-7' : 'translate-x-1'}`} />
-                      </button>
-                    </div>
-                    {videoConfig.useImageReference && (
-                      <>
-                        <input
-                          type="text"
-                          value={videoConfig.referenceImageUrl}
-                          onChange={(e) => setVideoConfig(c => ({ ...c, referenceImageUrl: e.target.value }))}
-                          className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                          placeholder="https://example.com/product-image.jpg"
-                        />
-                        {selectedImages.length > 0 && (
-                          <div>
-                            <p className="text-xs text-dark-400 mb-2">Or select from page images:</p>
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                              {selectedImages.slice(0, 5).map((img, i) => (
-                                <button
-                                  key={i}
-                                  onClick={() => setVideoConfig(c => ({ ...c, referenceImageUrl: img.src }))}
-                                  className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all
-                                    ${videoConfig.referenceImageUrl === img.src ? 'border-purple-500' : 'border-dark-600 hover:border-dark-500'}`}
-                                >
-                                  <img src={img.src} alt={img.alt} className="w-full h-full object-cover" />
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-                
-                {/* Video System Prompt Preview */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs text-dark-400">📝 Video System Prompt</label>
-                    <button
-                      onClick={() => setShowSystemPrompt(!showSystemPrompt)}
-                      className="px-2 py-1 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg"
-                    >
-                      {showSystemPrompt ? 'Hide' : 'Preview'}
-                    </button>
-                  </div>
-                  
-                  {/* Video Config Summary */}
-                  <div className="mb-2 px-3 py-1.5 bg-purple-500/10 rounded-lg border border-purple-500/30 text-xs text-purple-300">
-                    🎬 {currentVideoModel.displayName} • {videoConfig.duration}s • {videoConfig.width}×{videoConfig.height} • {videoConfig.videoStyle}
-                  </div>
-                  
-                  {showSystemPrompt && (
-                    <div className="max-h-48 overflow-y-auto p-3 bg-dark-800 border border-dark-700 rounded-xl text-xs text-dark-200 font-mono whitespace-pre-wrap">
-                      {finalVideoSystemPrompt}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Summary */}
-            <div className="my-4 p-3 bg-dark-800/50 rounded-xl border border-dark-700/50">
-              <p className="text-xs text-dark-400 mb-1">Ready to process:</p>
-              <p className="text-sm text-dark-200">
-                {configMode === 'text' ? '📝' : '🎬'} {editedContent.length.toLocaleString()} chars • 🖼️ {selectedImages.length} images
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button onClick={() => setStep('edit')} className="flex-1 px-4 py-2.5 bg-dark-800 text-dark-300 rounded-xl border border-dark-700 hover:bg-dark-700">Back</button>
-              <button
-                onClick={handleSendToAI}
-                disabled={aiLoading || (configMode === 'text' ? !aiConfig.systemPrompt.trim() : !finalVideoSystemPrompt.trim())}
-                className={`flex-1 px-4 py-2.5 text-white font-medium rounded-xl disabled:opacity-50 flex items-center justify-center gap-2
-                  ${configMode === 'video' ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-primary-500 to-indigo-500'}`}
-              >
-                {aiLoading ? (
-                  <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Processing...</>
-                ) : configMode === 'video' ? (
-                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Generate Video Prompt</>
-                ) : (
-                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Generate</>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Result */}
-        {step === 'result' && (
-            <div className="lg:col-span-12 min-h-[600px] flex flex-col">
-            {/* Result Type Indicator */}
-            <div className="flex items-center gap-2 mb-3">
-              {configMode === 'video' ? (
-                <span className="px-3 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/50 text-purple-300 text-xs font-medium rounded-full flex items-center gap-1">
-                  🎬 Video Generation Result
-                </span>
-              ) : (
-                <span className="px-3 py-1 bg-primary-500/20 border border-primary-500/50 text-primary-300 text-xs font-medium rounded-full flex items-center gap-1">
-                  📝 Text Generation Result
-                </span>
               )}
             </div>
-            
-            {/* Controls - Responsive layout */}
-            <div className="flex flex-col gap-2 mb-3">
-              {/* View toggle and action buttons */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* View Mode Toggle */}
-                <div className="flex gap-1 bg-dark-800 rounded-lg p-1">
-                  <button
-                    onClick={() => setResultView('rendered')}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${resultView === 'rendered' ? (configMode === 'video' ? 'bg-purple-500' : 'bg-primary-500') + ' text-white' : 'text-dark-400 hover:text-white'}`}
-                  >{configMode === 'video' ? '🎬 Video' : '📊 Preview'}</button>
-                  <button
-                    onClick={() => setResultView('raw')}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${resultView === 'raw' ? (configMode === 'video' ? 'bg-purple-500' : 'bg-primary-500') + ' text-white' : 'text-dark-400 hover:text-white'}`}
-                  >📄 {configMode === 'video' ? 'Prompt' : 'Source'}</button>
-                </div>
-                
-                {/* Action Buttons */}
-                {(aiResult || videoResult) && (
-                  <div className="flex flex-wrap gap-1.5">
-                    <button 
-                      onClick={() => handleCopy(videoResult?.prompt || videoResult?.content || aiResult || '')} 
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-dark-800 hover:bg-dark-700 text-dark-300 rounded-lg whitespace-nowrap"
-                      title="Copy to clipboard"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                      <span className="hidden sm:inline">Copy</span>
-                    </button>
-                    {configMode !== 'video' && aiResult && (
-                      <>
-                        <button 
-                          onClick={handleDownload} 
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg whitespace-nowrap"
-                          title="Download file"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                          <span className="hidden sm:inline">Download</span>
-                        </button>
-                        <button 
-                          onClick={handleSaveTextToLibrary} 
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg whitespace-nowrap"
-                          title="Save to library"
-                        >
-                          📚 <span className="hidden sm:inline">Save</span>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {aiError && (
-              <div className="p-3 bg-red-900/30 border border-red-700/50 rounded-xl mb-3">
-                <p className="text-red-400 text-sm">{aiError}</p>
-              </div>
-            )}
-            
-            {/* Video Result */}
-            {configMode === 'video' && videoResult && (
-              <div className="flex-1 overflow-y-auto space-y-4">
-                {/* Video Generating Status */}
-                {(videoResult.type === 'pending' || videoPolling) && resultView === 'rendered' && (
-                  <div className="p-6 bg-gradient-to-br from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-xl">
-                    <div className="flex flex-col items-center text-center">
-                      <div className="relative w-20 h-20 mb-4">
-                        <svg className="w-20 h-20 animate-spin" viewBox="0 0 100 100">
-                          <circle 
-                            cx="50" cy="50" r="40" 
-                            stroke="currentColor" 
-                            strokeWidth="8" 
-                            fill="none" 
-                            className="text-dark-700"
-                          />
-                          <circle 
-                            cx="50" cy="50" r="40" 
-                            stroke="currentColor" 
-                            strokeWidth="8" 
-                            fill="none" 
-                            strokeDasharray={`${(videoResult.progress || 0) * 2.51} 251`}
-                            strokeLinecap="round"
-                            className="text-purple-500"
-                            style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-lg font-bold text-purple-300">{videoResult.progress || 0}%</span>
-                        </div>
-                      </div>
-                      <h3 className="text-lg font-semibold text-white mb-2">Generating Video...</h3>
-                      <p className="text-sm text-dark-400 mb-4">
-                        {videoResult.status === 'pending' ? 'Waiting in queue...' : 'Processing your video...'}
-                      </p>
-                      <div className="text-xs text-dark-500 space-y-1">
-                        <p>Model: {currentVideoModel.displayName}</p>
-                        <p>Duration: {videoConfig.duration}s • Size: {videoConfig.width}×{videoConfig.height}</p>
-                      </div>
-                      <button
-                        onClick={() => { stopPolling(); clearResult(); setStep('config'); }}
-                        className="mt-4 px-4 py-2 text-xs bg-dark-700 hover:bg-dark-600 text-dark-300 rounded-lg"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Video Player */}
-                {videoResult.type === 'video' && videoResult.videoUrl && resultView === 'rendered' && (
-                  <div className="bg-black rounded-xl overflow-hidden">
-                    <video 
-                      src={videoResult.videoUrl} 
-                      controls 
-                      autoPlay
-                      className="w-full aspect-video"
-                      poster={videoResult.thumbnailUrl}
-                    >
-                      Your browser does not support video playback.
-                    </video>
-                    <div className="p-3 bg-dark-800 border-t border-dark-700">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-dark-400">✅ Video Generated Successfully</span>
-                        <a 
-                          href={videoResult.videoUrl} 
-                          download 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Download Video
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* No Video - Show Prompt */}
-                {videoResult.type === 'text' && resultView === 'rendered' && (
-                  <div className="p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-medium text-purple-300">
-                        📝 Generated Video Prompt
-                      </span>
-                      {videoResult.status === 'failed' && (
-                        <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded">Failed</span>
-                      )}
-                    </div>
-                    <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono bg-dark-900 p-3 rounded-lg max-h-64 overflow-y-auto">
-                      {videoResult.prompt || videoResult.content}
-                    </pre>
-                    <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg">
-                      <p className="text-amber-400 text-xs">
-                        💡 {!settings.apiKey 
-                          ? 'API Key not configured. Add your POE API key in Settings to generate videos.'
-                          : 'Copy this prompt and use it with video generation tools, or check if the selected model supports video generation.'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Raw Prompt View */}
-                {resultView === 'raw' && videoResult.prompt && (
-                  <div className="p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-medium text-purple-300">📝 Video Prompt</span>
-                    </div>
-                    <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono bg-dark-900 p-3 rounded-lg">
-                      {videoResult.prompt}
-                    </pre>
-                  </div>
-                )}
-                
-                {/* Video Info */}
-                {videoResult.type === 'video' && resultView === 'rendered' && (
-                  <div className="p-3 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-                    <h4 className="text-xs font-medium text-dark-400 mb-2">Video Details</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-dark-500">Model:</span> <span className="text-dark-200">{currentVideoModel.displayName}</span></div>
-                      <div><span className="text-dark-500">Duration:</span> <span className="text-dark-200">{videoConfig.duration}s</span></div>
-                      <div><span className="text-dark-500">Size:</span> <span className="text-dark-200">{videoConfig.width}×{videoConfig.height}</span></div>
-                      <div><span className="text-dark-500">Style:</span> <span className="text-dark-200">{videoConfig.videoStyle}</span></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {/* Text Result */}
-            {configMode === 'text' && aiResult && (
-              <div className="flex-1 overflow-y-auto p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-                {resultView === 'raw' ? (
-                  <pre className="text-sm text-dark-200 whitespace-pre-wrap font-mono">{aiResult}</pre>
-                ) : (
-                  <div className="prose prose-invert max-w-none">{renderResult(aiResult, aiConfig.outputFormat)}</div>
-                )}
-              </div>
-            )}
-            
-            {/* No Result */}
-            {!aiResult && !videoResult && !aiError && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center text-dark-400">
-                  <p>No result generated</p>
-                </div>
-              </div>
-            )}
-            
-            <button 
-              onClick={handleReset} 
-              className={`mt-4 px-4 py-2.5 text-white font-medium rounded-xl flex items-center justify-center gap-2
-                ${configMode === 'video' ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-primary-500 to-indigo-500'}`}
+
+            <button
+              onClick={() => setModal(null)}
+              className="w-full mt-12 py-5 bg-slate-900 text-white rounded-[2rem] text-[10px] font-black shadow-2xl hover:bg-blue-600 transition-all active:scale-95 uppercase tracking-[0.2em]"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Start New
+              {t.saveSettings}
             </button>
           </div>
-        )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
+
+export default App;

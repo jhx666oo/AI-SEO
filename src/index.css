@@ -7,6 +7,26 @@
 :root {
   --primary: #0ea5e9;
   --primary-dark: #0284c7;
+  --bg-dark: #f8fafc;
+  --bg-darker: #f1f5f9;
+  --surface: #ffffff;
+  --surface-light: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --success: #22c55e;
+  --error: #ef4444;
+  --warning: #f59e0b;
+
+  /* Semantic additions */
+  --header-bg: rgba(255, 255, 255, 0.8);
+  --card-bg: #ffffff;
+  --input-bg: #f1f5f9;
+  --item-hover: #f1f5f9;
+  --item-selected: #e0f2fe;
+}
+
+[data-theme='dark'] {
   --bg-dark: #0f172a;
   --bg-darker: #020617;
   --surface: #1e293b;
@@ -14,9 +34,13 @@
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --border: #334155;
-  --success: #22c55e;
-  --error: #ef4444;
-  --warning: #f59e0b;
+
+  /* Semantic additions */
+  --header-bg: rgba(15, 23, 42, 0.8);
+  --card-bg: #1e293b;
+  --input-bg: #0f172a;
+  --item-hover: #334155;
+  --item-selected: rgba(14, 165, 233, 0.1);
 }
 
 * {
@@ -27,7 +51,7 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: var(--bg-dark);
+  background-color: var(--bg-dark);
   color: var(--text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -55,18 +79,39 @@ body {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-10px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .animate-fadeIn {
@@ -83,9 +128,9 @@ body {
 
 /* Glass effect */
 .glass {
-  background: rgba(30, 41, 59, 0.8);
+  background: var(--header-bg);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-bottom: 1px solid var(--border);
 }
 
 /* Gradient backgrounds */
@@ -94,6 +139,6 @@ body {
 }
 
 .gradient-dark {
-  background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  background: var(--bg-dark);
+  /* Support light mode too */
 }
-
