@@ -293,7 +293,7 @@
 > - 视频模型的原生 API 通常禁止浏览器直接调用（CORS 限制）
 > - 使用 LLM Lite 中转服务器可以绕过 CORS 限制
 > - 提供更好的安全性和配额管理
-> - 详见 [LLM Lite 对接指南](./docs/LLM_LITE_INTEGRATION.md)
+> - 详见 [API 部署与配置指南](./docs/API_CONFIGURATION.md)
 
 ## 📁 项目结构
 
@@ -302,9 +302,10 @@
 ├── public/                 # 静态资源
 │   └── icons/             # 图标文件
 ├── docs/                   # 文档目录
-│   ├── INTERNAL_MODE_API_KEY_MANAGEMENT.md  # API Key 管理文档
-│   ├── DEPLOYMENT_CHECKLIST.md              # 上线前检查清单
-│   └── LLM_LITE_INTEGRATION.md              # LLM Lite 对接指南
+│   ├── API_CONFIGURATION.md     # API 部署与配置手册
+│   ├── WEB_DEPLOYMENT_GUIDE.md  # Web 域名部署指南
+│   ├── DEPLOYMENT_CHECKLIST.md  # 上线前检查清单
+│   └── SECURITY.md              # 安全配置指南
 ├── src/
 │   ├── hooks/             # React Hooks
 │   │   ├── useAI.ts       # AI 请求逻辑（文本+视频）
@@ -341,7 +342,7 @@
    - ⚠️ **重要**: 不要将 `.env` 文件提交到 Git
    - API Key 存储在浏览器 Chrome Storage 中，请确保部署在 HTTPS 环境下
    - 使用 Internal Mode 时，API Key 通过环境变量管理，更安全
-   - 详细配置方法请参考 [API Key 管理文档](./docs/INTERNAL_MODE_API_KEY_MANAGEMENT.md)
+   - 详细配置方法请参考 [API 部署与配置指南](./docs/API_CONFIGURATION.md)
 
 2. **语言配置**:
    - UI 语言（中文/英文）和 AI 输出语言（12种）是独立的

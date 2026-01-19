@@ -72,18 +72,10 @@
 - [ ] 预览模式正常 (`npm run preview`)
 
 ### 环境变量准备
-- [ ] 开发环境 `.env` 文件已配置（本地测试用）
-- [ ] 生产环境环境变量已准备（根据部署方式选择）：
-  - 方案一：后端代理服务（推荐）
-    - `VITE_PROXY_BASE_URL`
-    - `VITE_INTERNAL_SESSION_TOKEN`
-  - 方案二：环境变量直连（仅内部使用）
-    - `VITE_DOUBAO_API_KEY`
-    - `VITE_QWEN_API_KEY`
-    - `VITE_OPENAI_API_KEY`
-    - `VITE_GROK_API_KEY`
-    - `VITE_GEMINI_API_KEY`
-    - `VITE_PERPLEXITY_API_KEY`
+- [x] 开发环境 `.env` 文件已配置（本地测试用）
+- [ ] 生产环境环境变量已准备 (LiteLLM Gateway):
+    - `VITE_LITELLM_API_KEY`: 网关虚拟密钥 (Virtual Key)
+    - `VITE_LITELLM_BASE_URL`: 网关 API 地址 (默认: https://litellm.xooer.com/v1)
 
 ### 部署平台配置
 - [ ] 部署平台已选择（Vercel / Netlify / Cloudflare Pages / 自建服务器等）

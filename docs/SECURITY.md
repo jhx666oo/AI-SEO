@@ -195,9 +195,9 @@ gitleaks detect --source . --verbose
 
 ## 相关文档
 
-- [安全审计报告](./security_audit_report.md)
-- [API Key 管理文档](../docs/INTERNAL_MODE_API_KEY_MANAGEMENT.md)
-- [部署检查清单](../docs/DEPLOYMENT_CHECKLIST.md)
+- [API 部署与配置指南](./API_CONFIGURATION.md)
+- [Web 域名部署指南](./WEB_DEPLOYMENT_GUIDE.md)
+- [上线前检查清单](./DEPLOYMENT_CHECKLIST.md)
 
 ---
 
