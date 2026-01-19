@@ -17,14 +17,25 @@ export interface Settings {
   wordpressApiKey?: string;
   wordpressUsername?: string;
   wordpressPassword?: string;
+  // New fields for AI Config
+  systemPrompt: string;
+  outputLanguage: string;
+  outputFormat: string;
+  enableWebSearch: boolean;
+  reasoningEffort: 'low' | 'medium' | 'high';
+  // New fields for Video Config
+  videoModel: VideoModel;
+  videoDuration: number;
+  videoWidth: number;
+  videoHeight: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
-  baseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-5.2',
-  apiMode: 'custom',
-  provider: 'gpt',
+  baseUrl: 'https://litellm.xooer.com/v1',  // LiteLLM Gateway
+  model: 'gpt-5.2',  // 使用 LiteLLM 服务器上可用的最新模型
+  apiMode: 'internal',  // 使用生产模式
+  provider: 'gpt',  // 统一为 gpt (OpenAI 兼容接口)
   companyName: '',
   brandName: '',
   theme: 'light',
@@ -35,6 +46,17 @@ export const DEFAULT_SETTINGS: Settings = {
   wordpressApiKey: '',
   wordpressUsername: '',
   wordpressPassword: '',
+  // Default AI Config values
+  systemPrompt: '',
+  outputLanguage: 'auto',
+  outputFormat: 'markdown',
+  enableWebSearch: false,
+  reasoningEffort: 'medium',
+  // Default Video Config values
+  videoModel: 'sora-2',
+  videoDuration: 5,
+  videoWidth: 1280,
+  videoHeight: 720,
 };
 
 // AI Config for request
@@ -45,6 +67,16 @@ export interface AIConfig {
   enableWebSearch: boolean;
   reasoningEffort: 'low' | 'medium' | 'high';
 }
+
+// Available models on LiteLLM server
+export const LITELLM_MODELS = [
+  { value: 'gpt-5.2', label: 'GPT-5.2 (Latest)', provider: 'OpenAI' },
+  { value: 'gpt-4', label: 'gpt-4', provider: 'OpenAI' },
+  { value: 'gpt-3.5-turbo', label: 'gpt-3.5-turbo', provider: 'OpenAI' },
+  { value: 'claude-3-sonnet', label: 'claude-3-sonnet', provider: 'Anthropic' },
+  { value: 'xai/grok-4-1-fast-reasoning-latest', label: 'Grok 4.1 Fast Reasoning', provider: 'xAI' },
+  { value: 'gemini/gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', provider: 'Google' },
+];
 
 export const DEFAULT_AI_CONFIG: AIConfig = {
   systemPrompt: '',
@@ -265,43 +297,27 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
 // Updated based on official API documentation
 export const PROVIDER_MODELS: Record<string, string[]> = {
   doubao: [
-    // Legacy model names (for reference only - not recommended for production):
-    'doubao-seed-1-8-251228',     // 深度思考 (deprecated: use Endpoint ID instead)
-    'doubao-seed-1-6-lite-251015', // 深度思考 (deprecated: use Endpoint ID instead)
-    'doubao-seed-1-6-flash-250828', // 深度思考 (deprecated: use Endpoint ID instead)
+    'doubao-pro-32k',             // Placeholder for Doubao
   ],
   qwen: [
-    'qwen-max',                   // 通义千问 (official ID, qwen3-max maps to this)
-    'qwen-max-latest',            // 通义千问
-    'qwen-max-0125',              // 通义千问
-    'qwen-flash',                 // 通义千问
+    'qwen-max',                   // Placeholder for Qwen
   ],
   gpt: [
     'gpt-5.2',                    // OpenAI GPT-5.2
-    'gpt-5.1',                    // OpenAI GPT-5.1
-    'gpt-5',                      // OpenAI GPT-5
-    'gpt-5-mini',                 // OpenAI GPT-5 Mini
-    'GPT-4o',                     // OpenAI GPT-4o
-    'GPT-o3',                     // OpenAI O3
-    'GPT-4o-mini',                // OpenAI GPT-4o Mini
+    'gpt-4',                      // OpenAI GPT-4
+    'gpt-3.5-turbo',              // OpenAI GPT-3.5-turbo
+  ],
+  anthropic: [
+    'anthropic/claude-3-sonnet-20240229', // Anthropic Claude 3 Sonnet
   ],
   grok: [
-    'grok-4-1-fast-reasoning',    // Grok 文本、图像生文
-    'grok-code-fast-1',           // Grok 代码生成
+    'xai/grok-4-1-fast-reasoning-latest', // Grok 4.1 Fast Reasoning
   ],
   gemini: [
-    'gemini-3-pro-preview',       // Google Gemini 3 Pro
-    'gemini-3-flash-preview',     // Google Gemini 3 Flash
-    'gemini-2.5-flash',           // Google Gemini 2.5 Flash
-    'gemini-2.5-flash-lite',      // Google Gemini 2.5 Flash Lite
-    'gemini-2.5-pro',             // Google Gemini 2.5 Pro
-    'gemini-2.0-flash',           // Google Gemini 2.0 Flash
+    'gemini/gemini-2.5-flash-lite',       // Google Gemini 2.5 Flash Lite
   ],
   perplexity: [
-    'sonar',                      // Perplexity Sonar (official format: lowercase)
-    'sonar-pro',                  // Perplexity Sonar Pro (official format: lowercase with hyphen)
-    'sonar-reasoning-pro',        // Perplexity Sonar Reasoning Pro (official format: lowercase with hyphens)
-    'sonar-deep-research',        // Perplexity Sonar Deep Research (official format: lowercase with hyphens)
+    'sonar',                      // Placeholder for Perplexity
   ],
 };
 

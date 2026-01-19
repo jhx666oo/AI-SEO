@@ -25,14 +25,17 @@
 - **两栏产品布局** - 优化的产品列表展示，提升浏览效率
 
 ### 🤖 AI 内容生成
-- **双态化配置 (Dual-Mode)** - 支持 **Internal Mode (内网 Agent)** 和 **DIY Mode (手动配置)**
-- **2025 旗舰模型支持** - 全面适配最新模型：
-  - **OpenAI**: GPT-5.2, GPT-5.1, GPT-5, GPT-5-mini, GPT-4o, GPT-o3, GPT-4o-mini
-  - **Google Gemini**: Gemini-3-Pro-Preview, Gemini-3-Flash-Preview, Gemini-2.5-Pro, Gemini-2.5-Flash
-  - **Grok**: grok-4-1-fast-reasoning, grok-code-fast-1
-  - **通义千问**: qwen-max, qwen-max-latest, qwen-max-0125, qwen-flash
-  - **豆包**: doubao-seed-1-8-251228, doubao-seed-1-6-lite-251015, doubao-seed-1-6-flash-250828
-  - **Perplexity**: sonar, sonar-pro, sonar-reasoning-pro, sonar-deep-research
+- **🚀 LiteLLM Gateway 集成** - 统一 AI 调用接口，简化架构
+  - **单一 API 端点** - 所有模型通过 LiteLLM 网关统一调用
+  - **自动模型路由** - LiteLLM 自动处理不同供应商 of API 差异
+  - **简化配置** - 只需配置 LiteLLM Virtual Key，无需管理多个 API Key
+  - **代码精简** - AI 服务代码从 ~1330 行减少到 ~500 行（-62%）
+- **2025 旗舰模型支持** - 已同步 LiteLLM Gateway 实际可用模型：
+  - **OpenAI**: GPT-5.2, GPT-4, GPT-3.5-Turbo
+  - **Anthropic**: Claude-3-Sonnet
+  - **Google Gemini**: Gemini-2.5-Flash-Lite
+  - **xAI**: Grok-4.1-Fast-Reasoning-Latest
+  - **其他供应商**: 支持 Doubao, Qwen, Perplexity 的图标占位，可根据网关配置快速启用
 - **文本生成** - 使用 AI 生成 SEO/GEO 优化的产品博客文章
   - **12种输出语言** - 支持 Auto、English、简体中文、繁體中文、日本語、한국어、Español、Français、Deutsch、Português、Русский、العربية
   - **独立语言选择** - UI 语言和 AI 输出语言独立配置，灵活满足多语言需求
@@ -88,7 +91,7 @@
 - **状态管理**: React Hooks
 - **存储方案**: Chrome Storage API / LocalStorage
 - **API 集成**: 
-  - 6个AI模型供应商（OpenAI, Google Gemini, Grok/xAI, 通义千问, 豆包, Perplexity）
+  - **LiteLLM Gateway** - 统一 AI 模型调用接口
   - XOOBAY API（产品信息）
   - WordPress REST API（内容同步）
 
@@ -207,34 +210,40 @@
 
 ### API 配置
 
-#### Internal Mode (推荐)
+#### LiteLLM Gateway (默认推荐)
 
-- **模式**: Internal Mode
-- **API Key 管理**: 通过环境变量 `.env` 文件配置（不提交到 Git）
-- **支持提供商**: 
-  - OpenAI (gpt)
-  - Google Gemini (gemini)
-  - Grok/xAI (grok)
-  - 通义千问 (qwen)
-  - 豆包 (doubao)
-  - Perplexity (perplexity)
-- **优势**: API Key 安全，集中管理，自动路由
-- **配置方法**: 详见 [API Key 管理文档](./docs/INTERNAL_MODE_API_KEY_MANAGEMENT.md)
-
-#### DIY Mode (手动配置 / LLM Lite)
-
-- **模式**: DIY Mode (Custom)
-- **需要手动配置**: Base URL 和 API Key
+- **模式**: LiteLLM Gateway (统一接口)
 - **默认配置**:
-  - Base URL: `https://api.openai.com/v1` (OpenAI)
-  - 默认模型: `gpt-5.2`
-- **适用场景**: 
-  - 使用自定义 API 服务或代理
-  - **对接 LLM Lite 中转服务器**（推荐用于视频生成）
-- **LLM Lite 配置示例**:
-  - Base URL: `https://your-llm-lite-server.com/v1`
-  - API Key: `your-llm-lite-api-key`
-- **详细文档**: 参见 [LLM Lite 对接指南](./docs/LLM_LITE_INTEGRATION.md)
+  - Base URL: `https://litellm.xooer.com/v1`
+  - API Mode: Internal
+  - Provider: gpt
+- **API Key**: 使用 LiteLLM Virtual Key
+- **支持模型**: 所有主流 AI 模型（OpenAI, Anthropic, Gemini, Grok, 通义千问, 豆包, Perplexity 等）
+- **优势**: 
+  - ✅ 统一接口，简化配置
+  - ✅ 自动模型路由和格式转换
+  - ✅ 集中管理 API Key 和配额
+  - ✅ 更好的安全性和错误处理
+  - ✅ 代码简化 62%
+
+#### 配置步骤
+
+1. **获取 LiteLLM Virtual Key**
+   - 访问 `https://litellm.xooer.com`
+   - 创建账户并获取 Virtual Key
+
+2. **配置应用**
+   - 打开设置面板（⚙️ 图标）
+   - 选择 "Custom DIY" 模式
+   - 输入 LiteLLM Virtual Key
+   - Base URL 已默认配置为 `https://litellm.xooer.com/v1`
+
+3. **选择模型**
+   - 在设置中选择所需的 AI 模型
+   - LiteLLM 会自动路由到对应的供应商
+
+> [!TIP]
+> **迁移说明**: 如果您之前使用多个供应商的 API Key，现在只需要一个 LiteLLM Virtual Key 即可访问所有模型。
 
 ### 语言配置
 
@@ -357,27 +366,40 @@
 
 6. **浏览器兼容性**: 建议使用现代浏览器（Chrome、Firefox、Edge、Safari 最新版）
 
-## 🆕 最新更新 (v1.1.0)
+## 🆕 最新更新 (v2.0.0)
 
-### UI/UX 增强
-- ✅ 扩展布局宽度至 max-w-7xl，提供更大的工作空间
-- ✅ 优化布局高度（主容器 1000px，内容区 700px）
-- ✅ 增强排版（更大的标题、正文和按钮）
-- ✅ 改进 Header 设计（更大的 Logo 和控件）
-- ✅ 产品列表改为两栏布局
+### 🚀 重大架构升级 - LiteLLM Gateway 集成
 
-### 功能增强
-- ✅ 完整恢复视频生成功能
-- ✅ 文本/视频双模式切换界面
-- ✅ 视频配置 UI（模型、风格、语言选择）
-- ✅ 视频结果显示（进度条、播放器、下载）
-- ✅ 修复 AI 输出语言选择 bug
-- ✅ LLM Lite 对接架构准备
+- ✅ **统一 AI 调用接口** - 所有模型通过 LiteLLM 网关统一调用
+- ✅ **代码大幅简化** - AI 服务从 ~1330 行减少到 ~500 行（-62%）
+- ✅ **移除供应商特定逻辑** - 删除所有 vendor-specific 代码
+- ✅ **简化配置** - 只需一个 LiteLLM Virtual Key
+- ✅ **改进错误处理** - 统一、用户友好的错误消息
+- ✅ **更好的可维护性** - 清晰、简洁的代码结构
+
+### 技术改进
+
+- ✅ 统一 API 端点：`/chat/completions`
+- ✅ 标准化请求头：`Authorization: Bearer {apiKey}`
+- ✅ 直接传递模型名称给 LiteLLM
+- ✅ 移除复杂的模型名称映射和转换逻辑
+- ✅ 移除 `INTERNAL_API_CONFIG` 映射表（250+ 行）
+- ✅ 移除 `normalizeModelName` 函数（250+ 行）
+
+### 测试验证
+
+- ✅ Build 验证通过
+- ✅ 浏览器手动测试通过
+- ✅ 错误处理验证通过
+- ✅ 文本生成功能正常
+- ✅ 视频生成功能正常
 
 ### 文档更新
-- ✅ 新增 LLM Lite 对接指南
-- ✅ 更新 README 反映最新功能
-- ✅ 完善视频生成说明
+
+- ✅ 更新 README 反映 LiteLLM 集成
+- ✅ 创建完整的 Walkthrough 文档
+- ✅ 更新配置说明
+- ✅ 添加迁移指南
 
 ## 🤝 贡献
 

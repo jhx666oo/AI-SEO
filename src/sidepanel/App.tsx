@@ -328,7 +328,7 @@ export const App: React.FC = () => {
 
   const handleGenerate = async () => {
     setStep(4);
-    
+
     if (generationMode === "text") {
       // 文本生成逻辑
       let userPrompt = editedContent;
@@ -463,7 +463,7 @@ export const App: React.FC = () => {
               <React.Fragment key={idx}>
                 <div className="flex flex-col items-center gap-2">
                   <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 ${step === idx + 1 ? "bg-blue-600 text-white shadow-xl shadow-blue-100 ring-4 ring-blue-50" :
-                      step > idx + 1 ? "bg-emerald-500 text-white shadow-lg" : "bg-white text-slate-300 border border-slate-200"
+                    step > idx + 1 ? "bg-emerald-500 text-white shadow-lg" : "bg-white text-slate-300 border border-slate-200"
                     }`}>
                     {step > idx + 1 ? <CheckCircle2 className="w-5 h-5" /> : (
                       idx === 0 ? <Search className="w-4 h-4" /> :
@@ -524,8 +524,8 @@ export const App: React.FC = () => {
                         key={p.id}
                         onClick={() => handleSelectProduct(p.id)}
                         className={`group p-4 border-2 rounded-3xl cursor-pointer transition-all flex items-center gap-5 ${selectedProductId === p.id
-                            ? "border-blue-600 bg-blue-50/30 shadow-lg shadow-blue-50"
-                            : "border-slate-50 hover:border-slate-200 bg-white"
+                          ? "border-blue-600 bg-blue-50/30 shadow-lg shadow-blue-50"
+                          : "border-slate-50 hover:border-slate-200 bg-white"
                           }`}
                       >
                         <div className="relative">
@@ -830,11 +830,10 @@ export const App: React.FC = () => {
                         <button
                           key={style.code}
                           onClick={() => setVideoConfig(prev => ({ ...prev, videoStyle: style.code as any }))}
-                          className={`p-6 rounded-3xl border-2 transition-all text-left ${
-                            videoConfig.videoStyle === style.code
-                              ? "border-blue-600 bg-blue-50/30 shadow-lg shadow-blue-50"
-                              : "border-slate-100 bg-white hover:border-slate-200"
-                          }`}
+                          className={`p-6 rounded-3xl border-2 transition-all text-left ${videoConfig.videoStyle === style.code
+                            ? "border-blue-600 bg-blue-50/30 shadow-lg shadow-blue-50"
+                            : "border-slate-100 bg-white hover:border-slate-200"
+                            }`}
                         >
                           <div className="text-3xl mb-3">{style.icon}</div>
                           <div className="text-sm font-black text-slate-800 mb-1">{style.label}</div>
@@ -853,24 +852,23 @@ export const App: React.FC = () => {
             <div className="p-8 lg:p-12 flex-1 flex flex-col animate-in scale-in-95 duration-500">
               <div className="flex items-center justify-between mb-10">
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
-                    (aiLoading || videoPolling) ? "bg-blue-600 animate-pulse text-white" : 
-                    (aiResult || (videoResult && videoResult.status === 'completed')) ? "bg-emerald-500 text-white" : 
-                    "bg-red-500 text-white"
-                  }`}>
-                    {(aiLoading || videoPolling) ? <RefreshCw className="w-5 h-5 animate-spin" /> : 
-                     (aiResult || (videoResult && videoResult.status === 'completed')) ? <CheckCircle2 className="w-5 h-5" /> :
-                     <AlertCircle className="w-5 h-5" />}
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${(aiLoading || videoPolling) ? "bg-blue-600 animate-pulse text-white" :
+                    (aiResult || (videoResult && videoResult.status === 'completed')) ? "bg-emerald-500 text-white" :
+                      "bg-red-500 text-white"
+                    }`}>
+                    {(aiLoading || videoPolling) ? <RefreshCw className="w-5 h-5 animate-spin" /> :
+                      (aiResult || (videoResult && videoResult.status === 'completed')) ? <CheckCircle2 className="w-5 h-5" /> :
+                        <AlertCircle className="w-5 h-5" />}
                   </div>
                   <div>
                     <h2 className="text-3xl font-black text-slate-800 tracking-tight">
                       {generationMode === "text" ? (
                         aiLoading ? t.generating : "Content Optimized"
                       ) : (
-                        videoPolling ? "视频生成中..." : 
-                        videoResult?.status === 'completed' ? "视频生成完成" :
-                        videoResult?.status === 'failed' ? "视频生成失败" :
-                        aiLoading ? "准备生成视频..." : "视频生成"
+                        videoPolling ? "视频生成中..." :
+                          videoResult?.status === 'completed' ? "视频生成完成" :
+                            videoResult?.status === 'failed' ? "视频生成失败" :
+                              aiLoading ? "准备生成视频..." : "视频生成"
                       )}
                     </h2>
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-2">
@@ -878,9 +876,9 @@ export const App: React.FC = () => {
                         aiLoading ? "Deep Neural processing..." : "Ready for deployment"
                       ) : (
                         videoPolling ? `Processing... ${videoResult?.progress || 0}%` :
-                        videoResult?.status === 'completed' ? "Ready to download" :
-                        videoResult?.status === 'failed' ? "Please try again" :
-                        "Preparing video generation"
+                          videoResult?.status === 'completed' ? "Ready to download" :
+                            videoResult?.status === 'failed' ? "Please try again" :
+                              "Preparing video generation"
                       )}
                     </p>
                   </div>
@@ -1294,8 +1292,8 @@ export const App: React.FC = () => {
                         <div
                           key={provider.id}
                           className={`p-3 rounded-2xl border transition-all flex flex-col items-center gap-2 ${isTesting ? "bg-slate-100 animate-pulse border-transparent" :
-                              isSuccess ? "bg-emerald-50 border-emerald-100 shadow-lg shadow-emerald-500/20" :
-                                isError ? "bg-red-50 border-red-100" : "bg-white border-slate-100"
+                            isSuccess ? "bg-emerald-50 border-emerald-100 shadow-lg shadow-emerald-500/20" :
+                              isError ? "bg-red-50 border-red-100" : "bg-white border-slate-100"
                             }`}
                         >
                           <span className="text-lg grayscale-0 filter brightness-110">{provider.icon}</span>

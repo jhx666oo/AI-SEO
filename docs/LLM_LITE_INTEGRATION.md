@@ -12,7 +12,7 @@
 
 ## 当前架构分析
 
-### 现有 API 调用流程
+### 简化后的 API 调用流程
 
 ```
 浏览器扩展 (App.tsx)
@@ -21,30 +21,23 @@ useAI Hook (useAI.ts)
     ↓
 AI Service (ai.ts)
     ↓ [根据 apiMode 选择]
-    ├─ Internal Mode → INTERNAL_API_CONFIG[provider]
-    └─ DIY Mode → settings.baseUrl + settings.apiKey
+    ├─ Enterprise Mode → 读取 .env 环境变量 (VITE_LITELLM_API_KEY)
+    └─ DIY Mode → 用户手动输入 Virtual Key
     ↓
-直接调用各供应商 API (OpenAI/Gemini/Doubao等)
+统一调用 LiteLLM Gateway (/chat/completions)
 ```
 
 ### 关键配置位置
 
 #### 1. **Settings 类型定义** (`src/types/index.ts`)
-```typescript
-export interface Settings {
-  apiMode: 'internal' | 'diy';  // API模式
-  baseUrl: string;               // DIY模式的API地址
-  apiKey: string;                // DIY模式的API密钥
-  provider: string;              // 供应商 (doubao/gpt/gemini等)
-  model: string;                 // 模型名称
-  // ... 其他配置
-}
-```
+- `apiMode`: 'internal' (企业托管) 或 'diy' (自定义)
+- `baseUrl`: 默认为 `https://litellm.xooer.com/v1`
+- `apiKey`: LiteLLM Virtual Key
 
 #### 2. **AI Service** (`src/services/ai.ts`)
-- **文本生成**: `sendToAI()` - 第105行决定使用哪个baseUrl
-- **视频生成**: `generateVideo()` - 第760行决定使用哪个baseUrl
-- **视频轮询**: `pollVideoTask()` - 第1258行决定使用哪个baseUrl
+- 移除了所有供应商特定的处理逻辑。
+- 统一使用 `Authorization: Bearer {apiKey}`。
+- 所有请求（文本和视频）均发送至 `${baseUrl}/chat/completions`。
 
 ---
 

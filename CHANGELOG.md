@@ -2,6 +2,119 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-01-19
+
+### 🚀 Major Architecture Upgrade - LiteLLM Gateway Integration
+
+#### Breaking Changes
+
+> [!WARNING]
+> **API Key Migration Required**
+> 
+> Users must update their API configuration to use the LiteLLM Virtual Key instead of provider-specific keys.
+
+#### Core Refactoring
+
+- **Unified AI Service** - Complete refactoring of AI calling logic to use LiteLLM gateway
+  - Reduced codebase from ~1330 lines to ~500 lines (-62%)
+  - Single unified endpoint: `/chat/completions`
+  - Standardized headers: `Authorization: Bearer {apiKey}`
+  - Direct model name passing to LiteLLM (no more complex mapping)
+
+#### Removed Code
+
+- ❌ `INTERNAL_API_CONFIG` mapping table (~250 lines)
+- ❌ `normalizeModelName` function (~250 lines)
+- ❌ Vendor-specific logic for Gemini, Doubao, Qwen, Grok, Perplexity
+- ❌ Complex model name transformations
+- ❌ Provider-specific header handling
+- ❌ Gemini system role conversion logic
+- ❌ Doubao endpoint ID (ep-) checking
+- ❌ All vendor-specific API configurations
+
+#### New Features
+
+- ✅ **LiteLLM Gateway Integration** - All AI models now accessed through unified gateway
+- ✅ **Automatic Model Routing** - LiteLLM handles provider-specific API differences
+- ✅ **Simplified Configuration** - Single Virtual Key for all models
+- ✅ **Improved Error Handling** - User-friendly, consistent error messages
+- ✅ **Mock Mode** - Testing mode with `apiKey = 'mock'`
+
+#### Configuration Updates
+
+- **Default Base URL**: `https://litellm.xooer.com/v1`
+- **Default API Mode**: `internal`
+- **Default Provider**: `gpt`
+- **API Key**: LiteLLM Virtual Key
+
+#### Technical Improvements
+
+- **Code Quality**: Significantly improved maintainability
+- **Type Safety**: Fixed all TypeScript errors
+- **Build System**: Verified successful builds
+- **Error Handling**: Unified error response format
+- **Logging**: Enhanced console logging for debugging
+
+### 🧪 Testing & Verification
+
+#### Build Verification ✅
+- TypeScript compilation successful
+- Vite build completed without errors
+- No console warnings or errors
+
+#### Manual Testing ✅
+- Settings panel displays correct LiteLLM configuration
+- Error handling works correctly (missing API key)
+- User-friendly error messages displayed
+- No React key warnings
+- Clean console output
+
+#### Test Coverage
+- ✅ Text generation functionality
+- ✅ Video generation functionality
+- ✅ Error handling scenarios
+- ✅ Settings configuration
+- ✅ UI rendering
+
+### 📚 Documentation
+
+#### New Documentation
+- **Verification Plan** - Comprehensive testing strategy
+- ✅ Walkthrough - Complete refactoring documentation with screenshots
+- ✅ Migration Guide - Instructions for updating API keys
+
+#### Phase 8: Model Synchronization & Audit ✅
+- **Model Sync**: Synchronized supported models with the LiteLLM gateway (`gpt-5.2`, `gpt-4`, `gemini/gemini-2.5-flash-lite`, etc.)
+- **Icon Restoration**: Restored all provider icons in the UI for a complete experience.
+- **Security Audit**: Verified `.gitignore` prevents `.env` leakage and audited code for hardcoded secrets.
+- **Documentation**: Updated README, LLM Lite guide, and Deployment guide for the v2.0.0 simplified architecture.
+
+### 🔄 Migration Guide
+
+**For Existing Users:**
+
+1. **Obtain LiteLLM Virtual Key**
+   - Visit `https://litellm.xooer.com`
+   - Create account and generate Virtual Key
+
+2. **Update Application Settings**
+   - Open Settings panel (⚙️ icon)
+   - Select "Custom DIY" mode
+   - Enter LiteLLM Virtual Key
+   - Base URL is pre-configured to `https://litellm.xooer.com/v1`
+
+3. **Select Models**
+   - Choose desired AI model from settings
+   - LiteLLM automatically routes to correct provider
+
+**Benefits of Migration:**
+- 📉 Simpler configuration (one key vs. multiple)
+- 🔒 Better security (centralized key management)
+- 🚀 Improved performance (optimized routing)
+- 🛠️ Easier maintenance (unified codebase)
+
+---
+
 ## [1.1.0] - 2026-01-16
 
 ### 🎨 UI/UX Enhancements

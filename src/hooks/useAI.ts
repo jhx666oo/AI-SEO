@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Settings, AIConfig, DEFAULT_AI_CONFIG, VideoConfig, VideoGenerationResult } from '@/types';
-import { sendToAI, generateVideo, pollVideoTask } from '@/services/ai';
+import { sendToAI, generateVideo, generateVideoPrompt, pollVideoTask } from '@/services/ai';
 
 export function useAI() {
   const [loading, setLoading] = useState(false);
@@ -8,7 +8,7 @@ export function useAI() {
   const [result, setResult] = useState<string | null>(null);
   const [videoResult, setVideoResult] = useState<VideoGenerationResult | null>(null);
   const [videoPolling, setVideoPolling] = useState(false);
-  
+
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const settingsRef = useRef<Settings | null>(null);
 
@@ -31,14 +31,14 @@ export function useAI() {
 
   const startPolling = useCallback((taskId: string, prompt: string) => {
     if (!settingsRef.current) return;
-    
+
     setVideoPolling(true);
     let pollCount = 0;
     const maxPolls = 60; // Max 5 minutes (60 * 5s)
-    
+
     pollingRef.current = setInterval(async () => {
       pollCount++;
-      
+
       if (pollCount > maxPolls) {
         stopPolling();
         setError('Video generation timed out. Please try again.');
@@ -49,7 +49,7 @@ export function useAI() {
       try {
         const response = await pollVideoTask(taskId, settingsRef.current!);
         console.log('[Polling] Result:', response);
-        
+
         if (response.result.status === 'completed' && response.result.videoUrl) {
           stopPolling();
           setVideoResult({
@@ -89,7 +89,7 @@ export function useAI() {
     console.log('[useAI] sendPrompt called');
     console.log('[useAI] Settings:', { baseUrl: settings.baseUrl, model: settings.model, hasApiKey: !!settings.apiKey });
     console.log('[useAI] AI Config:', { outputLanguage: aiConfig.outputLanguage, outputFormat: aiConfig.outputFormat });
-    
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -98,7 +98,7 @@ export function useAI() {
 
     try {
       const response = await sendToAI(userContent, settings, aiConfig);
-      
+
       if (response.error) {
         const errorMsg = response.error;
         console.error('[useAI] AI request failed:', errorMsg);
@@ -138,12 +138,24 @@ export function useAI() {
     setResult(null);
     setVideoResult(null);
     stopPolling();
-    
-    settingsRef.current = settings;
+
+    settingsRef.current = settings; // Store settings for polling
 
     try {
-      const response = await generateVideo(productDescription, videoSystemPrompt, videoConfig, settings);
-      
+      // Step 1: Generate video prompt first
+      const promptResponse = await generateVideoPrompt(productDescription, videoSystemPrompt, settings);
+
+      if (promptResponse.error) {
+        setError(promptResponse.error);
+        setLoading(false);
+        return null; // Return null on error
+      }
+
+      const videoPrompt = promptResponse.prompt;
+
+      // Step 2: Generate video using the prompt
+      const response = await generateVideo(videoPrompt, videoConfig, settings);
+
       if (response.error && !response.result.taskId) {
         // Error without task ID means complete failure
         setError(response.error);

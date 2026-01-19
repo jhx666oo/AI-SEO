@@ -51,37 +51,18 @@ export async function sendToAI(
 ): Promise<AIResponse> {
     console.log('[AI Service] ========== AI REQUEST STARTED ==========');
     console.log('[AI Service] LiteLLM Gateway Mode');
-    console.log('[AI Service] API Mode:', settings.apiMode);
     console.log('[AI Service] Base URL:', settings.baseUrl);
     console.log('[AI Service] Model:', settings.model);
-
-    // Determine API Key based on mode
-    let apiKey = settings.apiKey;
-    let baseUrl = settings.baseUrl;
-
-    // Enterprise Mode (Internal): Read from environment variables
-    if (settings.apiMode === 'internal') {
-        console.log('[AI Service] Enterprise Mode - Reading from environment variables');
-        apiKey = import.meta.env.VITE_LITELLM_API_KEY || '';
-        baseUrl = import.meta.env.VITE_LITELLM_BASE_URL || 'https://litellm.xooer.com/v1';
-        console.log('[AI Service] Env API Key Length:', apiKey ? apiKey.length : 0);
-        console.log('[AI Service] Env Base URL:', baseUrl);
-    } else {
-        console.log('[AI Service] Custom DIY Mode - Using user-provided settings');
-        console.log('[AI Service] User API Key Length:', apiKey ? apiKey.length : 0);
-    }
+    console.log('[AI Service] API Key Length:', settings.apiKey ? settings.apiKey.length : 0);
 
     // Validate API Key
-    if (!apiKey) {
-        const errorMsg = settings.apiMode === 'internal'
-            ? 'Enterprise API Key not configured. Please add VITE_LITELLM_API_KEY to .env file.'
-            : 'API Key not configured. Please add your LiteLLM Virtual Key in Settings.';
-        console.error('[AI Service] Error:', errorMsg);
+    if (!settings.apiKey) {
+        const errorMsg = 'API Key not configured. Please add your LiteLLM Virtual Key in Settings.';
         return { content: '', error: errorMsg };
     }
 
     // MOCK MODE FOR TESTING
-    if (apiKey === 'mock') {
+    if (settings.apiKey === 'mock') {
         console.log('[AI Service] MOCK MODE ACTIVE');
         await new Promise(resolve => setTimeout(resolve, 1000));
         return {
@@ -90,9 +71,8 @@ export async function sendToAI(
     }
 
     // Validate Base URL
-    if (!baseUrl) {
+    if (!settings.baseUrl) {
         const errorMsg = 'Base URL not configured. Please check your settings.';
-        console.error('[AI Service] Error:', errorMsg);
         return { content: '', error: errorMsg };
     }
 
@@ -127,7 +107,7 @@ export async function sendToAI(
     };
 
     // Unified endpoint - all requests go to /chat/completions
-    const apiUrl = `${baseUrl}/chat/completions`;
+    const apiUrl = `${settings.baseUrl}/chat/completions`;
 
     console.log('[AI Service] Endpoint:', apiUrl);
     console.log('[AI Service] Model:', requestBody.model);
@@ -136,7 +116,7 @@ export async function sendToAI(
     try {
         // Standard OpenAI headers
         const headers: Record<string, string> = {
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${settings.apiKey}`,
             'Content-Type': 'application/json',
         };
 
@@ -213,21 +193,10 @@ export async function generateVideoPrompt(
 ): Promise<{ prompt: string; error?: string }> {
     console.log('[Video Prompt] ========== GENERATING VIDEO PROMPT ==========');
     console.log('[Video Prompt] LiteLLM Gateway Mode');
-    console.log('[Video Prompt] API Mode:', settings.apiMode);
     console.log('[Video Prompt] Base URL:', settings.baseUrl);
 
-    // Determine API Key based on mode
-    let apiKey = settings.apiKey;
-    let baseUrl = settings.baseUrl;
-
-    if (settings.apiMode === 'internal') {
-        console.log('[Video Prompt] Enterprise Mode - Reading from environment variables');
-        apiKey = import.meta.env.VITE_LITELLM_API_KEY || '';
-        baseUrl = import.meta.env.VITE_LITELLM_BASE_URL || 'https://litellm.xooer.com/v1';
-    }
-
     // Validate API Key
-    if (!apiKey) {
+    if (!settings.apiKey) {
         return { prompt: '', error: 'API Key not configured. Please add your LiteLLM Virtual Key in Settings.' };
     }
 
@@ -246,14 +215,14 @@ export async function generateVideoPrompt(
         stream: false
     };
 
-    const apiUrl = `${baseUrl}/chat/completions`;
+    const apiUrl = `${settings.baseUrl}/chat/completions`;
 
     console.log('[Video Prompt] Endpoint:', apiUrl);
     console.log('[Video Prompt] Model:', model);
 
     try {
         const headers: Record<string, string> = {
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${settings.apiKey}`,
             'Content-Type': 'application/json',
         };
 
@@ -292,22 +261,11 @@ export async function createVideoTask(
 ): Promise<VideoResponse> {
     console.log('[Video API] ========== CREATE VIDEO TASK ==========');
     console.log('[Video API] LiteLLM Gateway Mode');
-    console.log('[Video API] API Mode:', settings.apiMode);
     console.log('[Video API] Base URL:', settings.baseUrl);
     console.log('[Video API] Model:', videoConfig.model);
 
-    // Determine API Key based on mode
-    let apiKey = settings.apiKey;
-    let baseUrl = settings.baseUrl;
-
-    if (settings.apiMode === 'internal') {
-        console.log('[Video API] Enterprise Mode - Reading from environment variables');
-        apiKey = import.meta.env.VITE_LITELLM_API_KEY || '';
-        baseUrl = import.meta.env.VITE_LITELLM_BASE_URL || 'https://litellm.xooer.com/v1';
-    }
-
     // Validate API Key
-    if (!apiKey) {
+    if (!settings.apiKey) {
         return {
             result: {
                 type: 'text',
@@ -320,7 +278,7 @@ export async function createVideoTask(
     }
 
     // MOCK MODE FOR TESTING
-    if (apiKey === 'mock') {
+    if (settings.apiKey === 'mock') {
         console.log('[Video API] MOCK MODE ACTIVE');
         await new Promise(resolve => setTimeout(resolve, 2000));
         return {
@@ -355,14 +313,14 @@ export async function createVideoTask(
     };
 
     // Unified endpoint
-    const apiUrl = `${baseUrl}/chat/completions`;
+    const apiUrl = `${settings.baseUrl}/chat/completions`;
 
     console.log('[Video API] Endpoint:', apiUrl);
     console.log('[Video API] Request body:', JSON.stringify(requestBody, null, 2));
 
     try {
         const headers: Record<string, string> = {
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${settings.apiKey}`,
             'Content-Type': 'application/json',
         };
 
@@ -447,16 +405,7 @@ export async function pollVideoTask(
 ): Promise<VideoResponse> {
     console.log('[Video Poll] Polling task:', taskId);
 
-    // Determine API Key based on mode
-    let apiKey = settings.apiKey;
-    let baseUrl = settings.baseUrl;
-
-    if (settings.apiMode === 'internal') {
-        apiKey = import.meta.env.VITE_LITELLM_API_KEY || '';
-        baseUrl = import.meta.env.VITE_LITELLM_BASE_URL || 'https://litellm.xooer.com/v1';
-    }
-
-    if (!apiKey) {
+    if (!settings.apiKey) {
         return {
             result: {
                 type: 'text',
@@ -469,11 +418,11 @@ export async function pollVideoTask(
     }
 
     // Polling endpoint - adjust based on LiteLLM configuration
-    const apiUrl = `${baseUrl}/videos/tasks/${taskId}`;
+    const apiUrl = `${settings.baseUrl}/videos/tasks/${taskId}`;
 
     try {
         const headers: Record<string, string> = {
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${settings.apiKey}`,
             'Content-Type': 'application/json',
         };
 
