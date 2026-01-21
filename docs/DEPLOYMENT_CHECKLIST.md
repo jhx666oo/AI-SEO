@@ -52,7 +52,7 @@
 - [x] 环境变量配置说明准确
 - [x] 配置说明完整
 
-### API 部署文档 (INTERNAL_MODE_API_KEY_MANAGEMENT.md)
+### API 部署文档 (API_CONFIGURATION.md)
 - [x] 架构说明准确
 - [x] 环境变量列表完整
 - [x] 代码示例与当前实现一致
