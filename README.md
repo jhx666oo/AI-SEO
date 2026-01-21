@@ -77,11 +77,6 @@
 - **媒体库** - 管理和组织图片资源
 - **配置保存** - 自动保存 AI 配置和视频配置
 
-### 🌐 LLM Lite 集成准备
-- **架构就绪** - 已为 LLM Lite 中转 API 对接做好准备
-- **灵活配置** - 支持自定义 Base URL 和 API Key
-- **CORS 解决方案** - 通过中转服务器绕过浏览器跨域限制
-- **详细文档** - 提供完整的 LLM Lite 对接指南
 
 ## 🛠️ 技术栈
 
@@ -153,15 +148,10 @@
 
 ### 首次使用
 
-1. **配置 API Key**
+1. **配置 API 模式**
    - 点击右上角 ⚙️ 设置图标
-   - 选择 **API 模式**：
-     - **Internal Mode（推荐）**：通过环境变量配置6个供应商的 API Key（详见[配置说明](#-配置说明)）
-     - **DIY Mode（自定义）**：手动配置 Base URL 和 API Key（支持 LLM Lite）
-   - **DIY Mode 默认配置**：
-     - Base URL: `https://api.openai.com/v1`
-     - 默认模型: `gpt-5.2`
-   - 选择默认 AI 模型（支持6个供应商的模型）
+   - **企业托管模式 (Internal Mode)**: 推荐用于公司部署。管理员在服务器 `.env` 文件中配置 LiteLLM 网关密钥，终端用户无需任何配置即可直接使用。
+   - **自定义模式 (DIY Mode)**: 允许用户使用自己的 API Key。默认连接到 OpenAI 官方接口（`https://api.openai.com/v1`），也支持用户填写自己的 LiteLLM 中转地址。
 
 2. **配置 WordPress（可选）**
    - 在设置中输入 WordPress API URL
@@ -208,42 +198,23 @@
 
 ## ⚙️ 配置说明
 
-### API 配置
+### API 模式说明
 
-#### LiteLLM Gateway (默认推荐)
+#### 1. 企业托管模式 (Enterprise Managed / Internal)
+- **适用场景**: 公司内部部署，统一提供 AI 能力。
+- **配置方式**: 管理员在项目根目录 `.env` 文件中配置 `VITE_LITELLM_API_KEY`。
+- **优点**: 
+  - ✅ **免配置**: 终端用户打开即用，无需输入任何密钥。
+  - ✅ **中心化**: 统一管理配额、审计和模型路由。
+  - ✅ **安全性**: API Key 隐藏在网关后端（或通过服务器端构建硬编码），不暴露给终端用户。
 
-- **模式**: LiteLLM Gateway (统一接口)
+#### 2. 自定义模式 (Custom DIY)
+- **适用场景**: 个人使用，或者用户希望使用自己的私有密钥。
+- **配置方式**: 终端用户在应用“设置”面板中手动输入。
 - **默认配置**:
-  - Base URL: `https://litellm.xooer.com/v1`
-  - API Mode: Internal
-  - Provider: gpt
-- **API Key**: 使用 LiteLLM Virtual Key
-- **支持模型**: 所有主流 AI 模型（OpenAI, Anthropic, Gemini, Grok, 通义千问, 豆包, Perplexity 等）
-- **优势**: 
-  - ✅ 统一接口，简化配置
-  - ✅ 自动模型路由和格式转换
-  - ✅ 集中管理 API Key 和配额
-  - ✅ 更好的安全性和错误处理
-  - ✅ 代码简化 62%
-
-#### 配置步骤
-
-1. **获取 LiteLLM Virtual Key**
-   - 访问 `https://litellm.xooer.com`
-   - 创建账户并获取 Virtual Key
-
-2. **配置应用**
-   - 打开设置面板（⚙️ 图标）
-   - 选择 "Custom DIY" 模式
-   - 输入 LiteLLM Virtual Key
-   - Base URL 已默认配置为 `https://litellm.xooer.com/v1`
-
-3. **选择模型**
-   - 在设置中选择所需的 AI 模型
-   - LiteLLM 会自动路由到对应的供应商
-
-> [!TIP]
-> **迁移说明**: 如果您之前使用多个供应商的 API Key，现在只需要一个 LiteLLM Virtual Key 即可访问所有模型。
+  - **Base URL**: `https://api.openai.com/v1`
+  - **API Key**: 用户私有的 OpenAI Key。
+- **灵活性**: 用户也可以将 Base URL 修改为自己的 LiteLLM 中转地址或其他 OpenAI 兼容接口。
 
 ### 语言配置
 
