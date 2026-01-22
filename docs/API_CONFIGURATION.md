@@ -31,6 +31,7 @@ VITE_LITELLM_BASE_URL=https://your-gateway.com/v1
 | **OpenAI** | `gpt-5.2` | `gpt-5.2` |
 | **OpenAI** | `gpt-4` | `gpt-4` |
 | **Google** | `gemini/gemini-2.5-flash-lite` | `gemini/gemini-2.5-flash-lite` |
+| **Google** | `gemini/veo-2.0-generate-001` | `gemini/veo-2.0-generate-001` |
 | **xAI** | `xai/grok-4-1-fast-reasoning-latest` | `xai/grok-4-1-fast-reasoning-latest` |
 | **Anthropic** | `anthropic/claude-3-sonnet-20240229` | `anthropic/claude-3-sonnet-20240229` |
 

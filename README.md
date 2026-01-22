@@ -41,7 +41,7 @@
   - **独立语言选择** - UI 语言和 AI 输出语言独立配置，灵活满足多语言需求
 - **视频生成** 🎬 - 支持多种领先视频生成模型：
   - **OpenAI**: Sora-2, Sora-2-Pro
-  - **Google Veo**: Veo-3.1, Veo-3.0 系列
+  - **Google Veo**: Veo-3.1, Veo-3.0 系列, Veo-2.0
   - **通义千问**: Wan 2.6 T2V, Wan 2.5 T2V Preview, Wan 2.2 T2V Plus
   - **豆包**: Doubao Seedance 1.5 Pro
   - **双模式界面** - 文本/视频生成模式一键切换

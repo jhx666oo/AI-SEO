@@ -99,6 +99,7 @@ export type VideoModel =
   | 'veo-3.1-fast-generate-preview'
   | 'veo-3.0-generate-001'
   | 'veo-3.0-fast-generate-001'
+  | 'gemini/veo-2.0-generate-001'
   | 'doubao-seedance-1-5-pro-251215'
   | 'wan2.6-t2v'
   | 'wan2.5-t2v-preview'
@@ -205,6 +206,19 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     supportsImageReference: true,
     supportsSoundGeneration: false,
     description: 'Google Veo 3.0 Fast - faster generation',
+    provider: 'gemini',
+  },
+  {
+    name: 'gemini/veo-2.0-generate-001',
+    displayName: 'Google Veo 2.0',
+    maxDuration: 10,
+    minDuration: 3,
+    durationStep: 1,
+    defaultWidth: 1280,
+    defaultHeight: 720,
+    supportsImageReference: true,
+    supportsSoundGeneration: false,
+    description: 'Google Veo 2.0 - stable video generation model',
     provider: 'gemini',
   },
   // Doubao Video
