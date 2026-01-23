@@ -337,25 +337,20 @@ export async function createVideoTask(
     }
 
     // Build video generation request
-    const videoMessages = [
-        { role: 'system', content: 'You are a video generation assistant.' },
-        { role: 'user', content: prompt }
-    ];
-
+    // Standard LiteLLM/OpenAI-style media generation format
     const requestBody = {
         model: videoConfig.model,
-        messages: videoMessages,
-        temperature: 0.7,
-        // Video-specific parameters (if supported by LiteLLM)
-        video_config: {
-            duration: videoConfig.duration,
-            width: videoConfig.width,
-            height: videoConfig.height,
-        }
+        prompt: prompt,
+        duration: videoConfig.duration,
+        width: videoConfig.width,
+        height: videoConfig.height,
+        // Optional parameters for specific providers
+        negative_prompt: '',
+        quality: 'standard'
     };
 
-    // Unified endpoint
-    const apiUrl = `${baseUrl}/chat/completions`;
+    // Unified video endpoint
+    const apiUrl = `${baseUrl}/video/generations`;
 
     console.log('[Video API] Endpoint:', apiUrl);
     console.log('[Video API] Request body:', JSON.stringify(requestBody, null, 2));

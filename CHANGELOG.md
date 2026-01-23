@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [2.1.0] - 2026-01-23
+
+### 🎬 Video Generation Enhancements
+
+- ✅ **Restored Video Dimension UI** - Re-implemented width, height, and duration controls in the video generation module.
+- ✅ **Dynamic Defaults** - Video settings now automatically adjust based on the selected model's capabilities (min/max duration, default resolution).
+- ✅ **New Video Model Support** - Added support for `gemini/veo-2.0-generate-001`.
+- ✅ **API Logic Fix** - Corrected `createVideoTask` to use `/video/generations` endpoint instead of `/chat/completions` for proper media generation.
+- ✅ **Unified Body Format** - Standardized video generation request body.
+
+### 🎨 UI & UX
+
+- **Provider Icons** - Verified and polished provider icons in the settings panel.
+- **Refined Styling** - Improved layout and spacing in the sidepanel.
+
+---
+
 
 ## [2.0.0] - 2026-01-19
 

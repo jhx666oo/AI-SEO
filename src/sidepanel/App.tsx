@@ -28,7 +28,9 @@ import {
   ChevronUp,
   Activity,
   DownloadCloud,
-  Film
+  Film,
+  Clock,
+  Maximize
 } from "lucide-react";
 
 // --- 导入真实项目逻辑 ---
@@ -206,6 +208,9 @@ export const App: React.FC = () => {
   const [testResults, setTestResults] = useState<Record<string, { status: string; message?: string }>>({});
 
   const t = locales[lang];
+
+  // 计算当前选中的视频模型配置
+  const currentVideoModelConfig = VIDEO_MODELS.find(m => m.name === videoConfig.model) || VIDEO_MODELS[0];
 
   // --- 3. Content Renderers (Professional) ---
   const renderInlineMarkdown = (text: string): React.ReactNode => {
@@ -795,7 +800,17 @@ export const App: React.FC = () => {
                       <div className="relative group">
                         <select
                           value={videoConfig.model}
-                          onChange={(e) => setVideoConfig(prev => ({ ...prev, model: e.target.value as any }))}
+                          onChange={(e) => {
+                            const newModel = e.target.value as any;
+                            const modelDef = VIDEO_MODELS.find(m => m.name === newModel);
+                            setVideoConfig(prev => ({
+                              ...prev,
+                              model: newModel,
+                              duration: modelDef?.maxDuration ? Math.min(prev.duration, modelDef.maxDuration) : prev.duration,
+                              width: modelDef?.defaultWidth || prev.width,
+                              height: modelDef?.defaultHeight || prev.height
+                            }));
+                          }}
                           className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-base font-bold shadow-inner outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all appearance-none cursor-pointer"
                         >
                           {VIDEO_MODELS.map(m => <option key={m.name} value={m.name}>{m.displayName}</option>)}
@@ -816,6 +831,55 @@ export const App: React.FC = () => {
                           className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-base font-bold shadow-inner outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all appearance-none cursor-pointer"
                         >
                           {VIDEO_OUTPUT_LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-hover:text-blue-500 transition-colors w-4 h-4" />
+                      </div>
+                    </div>
+
+                    {/* 视频时长 */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5" /> 视频时长
+                        </label>
+                        <span className="text-sm font-black text-blue-600">{videoConfig.duration}s</span>
+                      </div>
+                      <div className="px-2">
+                        <input
+                          type="range"
+                          min={currentVideoModelConfig.minDuration}
+                          max={currentVideoModelConfig.maxDuration}
+                          step={currentVideoModelConfig.durationStep}
+                          value={videoConfig.duration}
+                          onChange={(e) => setVideoConfig(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
+                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                        <div className="flex justify-between mt-2 text-[10px] text-slate-400 font-bold">
+                          <span>{currentVideoModelConfig.minDuration}s</span>
+                          <span>{currentVideoModelConfig.maxDuration}s</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 分辨率 */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                        <Maximize className="w-3.5 h-3.5" /> 分辨率 / 画幅
+                      </label>
+                      <div className="relative group">
+                        <select
+                          value={`${videoConfig.width}x${videoConfig.height}`}
+                          onChange={(e) => {
+                            const [w, h] = e.target.value.split('x').map(Number);
+                            setVideoConfig(prev => ({ ...prev, width: w, height: h }));
+                          }}
+                          className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl text-base font-bold shadow-inner outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/5 transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="1920x1080">16:9 电影广角 (1920x1080)</option>
+                          <option value="1280x720">16:9 标准高清 (1280x720)</option>
+                          <option value="1080x1920">9:16 竖屏短视频 (1080x1920)</option>
+                          <option value="720x1280">9:16 竖屏流畅 (720x1280)</option>
+                          <option value="1024x1024">1:1 正方形 (1024x1024)</option>
                         </select>
                         <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-hover:text-blue-500 transition-colors w-4 h-4" />
                       </div>

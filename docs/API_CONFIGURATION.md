@@ -28,12 +28,12 @@ VITE_LITELLM_BASE_URL=https://your-gateway.com/v1
 
 | 供应商 | 应用内使用的 Model ID (Request Body) | 建议网关配置的名称 (LiteLLM model_name) |
 | :--- | :--- | :--- |
-| **OpenAI** | `gpt-5.2` | `gpt-5.2` |
-| **OpenAI** | `gpt-4` | `gpt-4` |
-| **Google** | `gemini/gemini-2.5-flash-lite` | `gemini/gemini-2.5-flash-lite` |
-| **Google** | `gemini/veo-2.0-generate-001` | `gemini/veo-2.0-generate-001` |
-| **xAI** | `xai/grok-4-1-fast-reasoning-latest` | `xai/grok-4-1-fast-reasoning-latest` |
-| **Anthropic** | `anthropic/claude-3-sonnet-20240229` | `anthropic/claude-3-sonnet-20240229` |
+| **OpenAI** | `gpt-4o` | `gpt-4o` |
+| **OpenAI** | `o3-mini` | `o3-mini` |
+| **OpenAI** | `gpt-4-turbo` | `gpt-4-turbo` |
+| **Anthropic** | `Claude-3.5-Sonnet` | `Claude-3.5-Sonnet` |
+| **Google Gemini** | `Gemini-1.5-Flash` | `Gemini-1.5-Flash` |
+| **xAI** | `Grok-2` | `Grok-2` |
 
 > [!IMPORTANT]
 > **关于占位模型**: 应用界面还保留了 Doubao, Qwen, Perplexity 的图标。如需启用，请在网关配置对应的模型名。
