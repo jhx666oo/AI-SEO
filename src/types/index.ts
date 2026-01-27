@@ -28,6 +28,15 @@ export interface Settings {
   videoDuration: number;
   videoWidth: number;
   videoHeight: number;
+  // Daily Usage Tracking
+  dailyUsage: DailyUsage;
+}
+
+export interface DailyUsage {
+  date: string; // YYYY-MM-DD
+  normalText: number;
+  proText: number;
+  video: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -53,10 +62,16 @@ export const DEFAULT_SETTINGS: Settings = {
   enableWebSearch: false,
   reasoningEffort: 'medium',
   // Default Video Config values
-  videoModel: 'sora-2',
+  videoModel: 'gemini/veo-3.1-generate-preview',
   videoDuration: 5,
   videoWidth: 1280,
   videoHeight: 720,
+  dailyUsage: {
+    date: new Date().toISOString().split('T')[0],
+    normalText: 0,
+    proText: 0,
+    video: 0,
+  },
 };
 
 // AI Config for request
@@ -71,11 +86,12 @@ export interface AIConfig {
 // Available models on LiteLLM server
 export const LITELLM_MODELS = [
   { value: 'gpt-5.2', label: 'GPT-5.2 (Latest)', provider: 'OpenAI' },
-  { value: 'gpt-4', label: 'gpt-4', provider: 'OpenAI' },
-  { value: 'gpt-3.5-turbo', label: 'gpt-3.5-turbo', provider: 'OpenAI' },
-  { value: 'claude-3-sonnet', label: 'claude-3-sonnet', provider: 'Anthropic' },
-  { value: 'xai/grok-4-1-fast-reasoning-latest', label: 'Grok 4.1 Fast Reasoning', provider: 'xAI' },
-  { value: 'gemini/gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', provider: 'Google' },
+  { value: 'gpt-4', label: 'GPT-4 Turbo', provider: 'OpenAI' },
+  { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', provider: 'OpenAI' },
+  { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet', provider: 'Anthropic' },
+  { value: 'vertex_ai/claude-sonnet-4-5', label: 'Claude 4.5 (Vertex)', provider: 'Anthropic' },
+  { value: 'xai/grok-4-1-fast-reasoning-latest', label: 'Grok 4.1 Reasoning', provider: 'xAI' },
+  { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', provider: 'Google' },
 ];
 
 export const DEFAULT_AI_CONFIG: AIConfig = {
@@ -95,11 +111,11 @@ export type VideoModel =
   // Official Video Models
   | 'sora-2'
   | 'sora-2-pro'
-  | 'veo-3.1-generate-preview'
-  | 'veo-3.1-fast-generate-preview'
-  | 'veo-3.0-generate-001'
-  | 'veo-3.0-fast-generate-001'
-  | 'veo-2.0-generate-001'
+  | 'gemini/veo-3.1-generate-preview'
+  | 'gemini/veo-3.1-fast-generate-preview'
+  | 'gemini/veo-3.0-generate-001'
+  | 'gemini/veo-3.0-fast-generate-001'
+  | 'gemini/veo-2.0-generate-001'
   | 'doubao-seedance-1-5-pro-251215'
   | 'wan2.6-t2v'
   | 'wan2.5-t2v-preview'
@@ -157,7 +173,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   },
   // Google Veo
   {
-    name: 'veo-3.1-generate-preview',
+    name: 'gemini/veo-3.1-generate-preview',
     displayName: 'Google Veo 3.1',
     maxDuration: 10,
     minDuration: 4,
@@ -170,7 +186,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     provider: 'gemini',
   },
   {
-    name: 'veo-3.1-fast-generate-preview',
+    name: 'gemini/veo-3.1-fast-generate-preview',
     displayName: 'Google Veo 3.1 Fast',
     maxDuration: 8,
     minDuration: 4,
@@ -183,7 +199,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     provider: 'gemini',
   },
   {
-    name: 'veo-3.0-generate-001',
+    name: 'gemini/veo-3.0-generate-001',
     displayName: 'Google Veo 3.0',
     maxDuration: 10,
     minDuration: 4,
@@ -196,7 +212,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     provider: 'gemini',
   },
   {
-    name: 'veo-3.0-fast-generate-001',
+    name: 'gemini/veo-3.0-fast-generate-001',
     displayName: 'Google Veo 3.0 Fast',
     maxDuration: 8,
     minDuration: 4,
@@ -209,7 +225,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     provider: 'gemini',
   },
   {
-    name: 'veo-2.0-generate-001',
+    name: 'gemini/veo-2.0-generate-001',
     displayName: 'Google Veo 2.0',
     maxDuration: 10,
     minDuration: 3,
@@ -293,7 +309,7 @@ export interface VideoConfig {
 }
 
 export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
-  model: 'sora-2',
+  model: 'gemini/veo-3.1-generate-preview',
   duration: 5,
   width: 1920,
   height: 1080,
@@ -311,27 +327,28 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
 // Updated based on official API documentation
 export const PROVIDER_MODELS: Record<string, string[]> = {
   doubao: [
-    'doubao-pro-32k',             // Placeholder for Doubao
+    'doubao-pro-4k',
   ],
   qwen: [
-    'qwen-max',                   // Placeholder for Qwen
+    'qwen-turbo',
   ],
   gpt: [
-    'gpt-5.2',                    // OpenAI GPT-5.2
-    'gpt-4',                      // OpenAI GPT-4
-    'gpt-3.5-turbo',              // OpenAI GPT-3.5-turbo
+    'gpt-5.2',
+    'gpt-4',
+    'gpt-3.5-turbo',
   ],
   anthropic: [
-    'anthropic/claude-3-sonnet-20240229', // Anthropic Claude 3 Sonnet
+    'claude-3-sonnet',
+    'vertex_ai/claude-sonnet-4-5',
   ],
   grok: [
-    'xai/grok-4-1-fast-reasoning-latest', // Grok 4.1 Fast Reasoning
+    'xai/grok-4-1-fast-reasoning-latest',
   ],
   gemini: [
-    'gemini/gemini-2.5-flash-lite',       // Google Gemini 2.5 Flash Lite
+    'gemini-2.5-flash-lite',
   ],
   perplexity: [
-    'sonar',                      // Placeholder for Perplexity
+    'sonar',
   ],
 };
 

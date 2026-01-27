@@ -36,3 +36,8 @@ npm-debug.log*
 *.zip
 *.pem
 
+# Temporary/Test Scripts
+*.mjs
+gateway_openapi.json
+gateway_openapi_raw.json
+

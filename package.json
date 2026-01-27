@@ -1,8 +1,8 @@
 {
-  "name": "page-reader-extension",
+  "name": "ai-seo-web-app",
   "version": "1.0.0",
   "type": "module",
-  "description": "AI-Powered Chrome Extension for Content Extraction and SEO/GEO Blog Generation",
+  "description": "AI-Powered Web Application for Content Extraction and SEO/GEO Blog Generation",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -14,30 +14,27 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@crxjs/vite-plugin": "^2.0.0-beta.28",
-    "@types/chrome": "^0.0.287",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^17.2.3",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2",
     "vite": "^5.4.11"
   },
   "keywords": [
-    "chrome-extension",
-    "page-reader",
     "ai",
-    "content-extraction",
     "seo",
     "geo",
     "blog-generator",
+    "content-extraction",
+    "web-application",
     "gpt",
     "claude",
     "gemini",
-    "web-scraper",
-    "manifest-v3",
+    "video-generation",
     "react",
     "typescript",
     "vite"
@@ -46,10 +43,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fql9/page-reader-extension"
+    "url": "https://github.com/jhx666oo/AI-SEO"
   },
   "bugs": {
-    "url": "https://github.com/fql9/page-reader-extension/issues"
+    "url": "https://github.com/jhx666oo/AI-SEO/issues"
   },
-  "homepage": "https://github.com/fql9/page-reader-extension#readme"
+  "homepage": "https://github.com/jhx666oo/AI-SEO#readme"
 }

@@ -9,11 +9,31 @@ const KEYS = {
 export async function getSettings(): Promise<Settings> {
   try {
     const stored = localStorage.getItem(KEYS.SETTINGS);
+    const today = new Date().toISOString().split('T')[0];
+
     if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...DEFAULT_SETTINGS, ...parsed };
+      const parsed = JSON.parse(stored) as Settings;
+      const settings = { ...DEFAULT_SETTINGS, ...parsed };
+
+      // Check and reset daily usage if date changed
+      if (!settings.dailyUsage || settings.dailyUsage.date !== today) {
+        settings.dailyUsage = {
+          date: today,
+          normalText: 0,
+          proText: 0,
+          video: 0
+        };
+        await saveSettings(settings);
+      }
+      return settings;
     }
-    return DEFAULT_SETTINGS;
+
+    // Initial setup
+    const defaultWithDate = {
+      ...DEFAULT_SETTINGS,
+      dailyUsage: { ...DEFAULT_SETTINGS.dailyUsage, date: today }
+    };
+    return defaultWithDate;
   } catch {
     return DEFAULT_SETTINGS;
   }

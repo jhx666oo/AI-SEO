@@ -106,11 +106,13 @@ export async function sendToAI(
     });
 
     // Build standard OpenAI-compatible request
-    // LiteLLM handles all model name normalization and provider routing
-    const messages: AIMessage[] = [
-        { role: 'system', content: aiConfig.systemPrompt },
-        { role: 'user', content: userContent }
-    ];
+    const messages: AIMessage[] = [];
+
+    if (aiConfig.systemPrompt && aiConfig.systemPrompt.trim()) {
+        messages.push({ role: 'system', content: aiConfig.systemPrompt });
+    }
+
+    messages.push({ role: 'user', content: userContent });
 
     // Temperature mapping based on reasoning effort
     const reasoningMap: Record<string, number> = {
@@ -234,10 +236,13 @@ export async function generateVideoPrompt(
     // Use reliable text model for prompt generation
     const model = settings.model || 'gpt-4o';
 
-    const messages = [
-        { role: 'system', content: videoSystemPrompt },
-        { role: 'user', content: productDescription }
-    ];
+    const messages: AIMessage[] = [];
+
+    if (videoSystemPrompt && videoSystemPrompt.trim()) {
+        messages.push({ role: 'system', content: videoSystemPrompt });
+    }
+
+    messages.push({ role: 'user', content: productDescription });
 
     const requestBody = {
         model,
@@ -349,8 +354,8 @@ export async function createVideoTask(
         quality: 'standard'
     };
 
-    // Unified video endpoint
-    const apiUrl = `${baseUrl}/video/generations`;
+    // Unified video endpoint - Plural /videos for LiteLLM Gateway
+    const apiUrl = `${baseUrl}/videos`;
 
     console.log('[Video API] Endpoint:', apiUrl);
     console.log('[Video API] Request body:', JSON.stringify(requestBody, null, 2));
@@ -372,13 +377,22 @@ export async function createVideoTask(
         if (!response.ok) {
             const errorText = await response.text();
             console.error('[Video API] Error:', errorText);
+
+            let detailedError = response.statusText;
+            try {
+                const errorJson = JSON.parse(errorText);
+                detailedError = errorJson.error?.message || errorJson.error || errorJson.detail || response.statusText;
+            } catch (e) {
+                // Not JSON
+            }
+
             return {
                 result: {
                     type: 'text',
                     status: 'failed',
                     content: prompt,
                     prompt,
-                    error: `Video generation failed: ${response.statusText}`
+                    error: `Video generation failed: ${detailedError}`
                 },
                 error: errorText
             };
@@ -463,8 +477,8 @@ export async function pollVideoTask(
         };
     }
 
-    // Polling endpoint - adjust based on LiteLLM configuration
-    const apiUrl = `${baseUrl}/videos/tasks/${taskId}`;
+    // Polling endpoint - /v1/videos/{id} based on LiteLLM OpenAPI schema
+    const apiUrl = `${baseUrl}/videos/${taskId}`;
 
     try {
         const headers: Record<string, string> = {

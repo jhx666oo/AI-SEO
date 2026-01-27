@@ -124,14 +124,14 @@ export async function getProductList(
   } catch (error) {
     console.error('[XOOBAY API] Error fetching product list:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     // 检测 CORS 跨域错误
     if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('CORS')) {
       const corsError = '检测到跨域拦截。请确保正式部署在公司域名下，或联系技术开放 API 跨域权限。';
       console.error('[XOOBAY API] CORS error detected:', corsError);
       throw new Error(corsError);
     }
-    
+
     throw error;
   }
 }
@@ -176,14 +176,14 @@ export async function getProductInfo(
   } catch (error) {
     console.error('[XOOBAY API] Error fetching product info:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     // 检测 CORS 跨域错误
     if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('CORS')) {
       const corsError = '检测到跨域拦截。请确保正式部署在公司域名下，或联系技术开放 API 跨域权限。';
       console.error('[XOOBAY API] CORS error detected:', corsError);
       throw new Error(corsError);
     }
-    
+
     throw error;
   }
 }
@@ -228,14 +228,14 @@ export async function getStoreInfo(
   } catch (error) {
     console.error('[XOOBAY API] Error fetching store info:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     // 检测 CORS 跨域错误
     if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('CORS')) {
       const corsError = '检测到跨域拦截。请确保正式部署在公司域名下，或联系技术开放 API 跨域权限。';
       console.error('[XOOBAY API] CORS error detected:', corsError);
       throw new Error(corsError);
     }
-    
+
     throw error;
   }
 }
@@ -257,15 +257,15 @@ export function convertProductToPageContent(
   text += `**SKU:** ${product.sku}\n`;
   text += `**Category:** ${product.category}\n`;
   text += `**Price:** $${product.price}\n\n`;
-  
+
   if (product.short_description) {
-    text += `## Short Description\n${product.short_description}\n\n`;
+    text += `## Meta Title\n${product.short_description}\n\n`;
   }
-  
+
   if (product.description) {
     text += `## Description\n${product.description}\n\n`;
   }
-  
+
   if (store) {
     text += `## Store Information\n`;
     text += `**Store Name:** ${store.name}\n`;
@@ -274,7 +274,7 @@ export function convertProductToPageContent(
     }
     text += `**Store URL:** ${store.store_url}\n\n`;
   }
-  
+
   if (product.brand_name) {
     text += `## Brand\n**Brand:** ${product.brand_name}\n`;
     if (product.brand_url) {
@@ -284,7 +284,7 @@ export function convertProductToPageContent(
 
   // 处理图片
   const images: Array<{ src: string; alt: string; width: number; height: number }> = [];
-  
+
   // 主图
   if (product.image_url) {
     images.push({
@@ -294,7 +294,7 @@ export function convertProductToPageContent(
       height: 800,
     });
   }
-  
+
   // 图库图片
   if (product.gallery_images && Array.isArray(product.gallery_images)) {
     product.gallery_images.forEach((imgUrl, index) => {

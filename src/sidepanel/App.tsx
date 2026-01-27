@@ -170,6 +170,20 @@ const PROVIDERS_LIST = [
   { id: "perplexity", name: "Perplexity", icon: "🔮", color: "bg-teal-500" }
 ];
 
+const DAILY_LIMITS = {
+  normalText: 5,
+  proText: 2,
+  video: 1
+};
+
+const getModelTier = (model: string): 'normalText' | 'proText' => {
+  const modelLower = model.toLowerCase();
+  if (modelLower.includes('flash') || modelLower.includes('mini') || modelLower.includes('lite') || modelLower.includes('3.5')) {
+    return 'normalText';
+  }
+  return 'proText';
+};
+
 export const App: React.FC = () => {
   // --- 1. 核心业务 Hooks ---
   const { settings, updateSettings, loading: settingsLoading } = useSettings();
@@ -332,45 +346,79 @@ export const App: React.FC = () => {
   };
 
   const handleGenerate = async () => {
+    // 检查每日限制 (仅在内部 API 模式下)
+    if (settings.apiMode === 'internal') {
+      const usage = settings.dailyUsage || { normalText: 0, proText: 0, video: 0 };
+      if (generationMode === 'text') {
+        const tier = getModelTier(settings.model);
+        if (usage[tier] >= DAILY_LIMITS[tier]) {
+          window.alert(`今日${tier === 'normalText' ? '轻量级' : '专业级'}试用额度已用完，请购买点数或明日再试。`);
+          return;
+        }
+      } else {
+        if (usage.video >= DAILY_LIMITS.video) {
+          window.alert('今日视频生成试用额度已用完，请购买点数或明日再试。');
+          return;
+        }
+      }
+    }
+
     setStep(4);
 
-    if (generationMode === "text") {
-      // 文本生成逻辑
-      let userPrompt = editedContent;
-      if (selectedImages.length > 0) {
-        userPrompt += "\n\n---\n\n## References Images:\n";
-        selectedImages.forEach((img, i) => {
-          userPrompt += `${i + 1}. ![${img.alt || "IMG"}](${img.src})\n`;
+    try {
+      if (generationMode === "text") {
+        // 文本生成逻辑
+        let userPrompt = editedContent;
+        if (selectedImages.length > 0) {
+          userPrompt += "\n\n---\n\n## References Images:\n";
+          selectedImages.forEach((img, i) => {
+            userPrompt += `${i + 1}. ![${img.alt || "IMG"}](${img.src})\n`;
+          });
+        }
+
+        const systemPrompt = buildSystemPrompt(
+          aiConfig.outputLanguage,
+          aiConfig.outputFormat,
+          aiConfig.reasoningEffort,
+          aiConfig.enableWebSearch,
+          settings.brandName,
+          settings.companyName
+        );
+
+        const res = await sendPrompt(userPrompt, settings, { ...aiConfig, systemPrompt });
+
+        // 生成成功，增加消耗计次 (仅在内部模式)
+        if (res && settings.apiMode === 'internal') {
+          const tier = getModelTier(settings.model);
+          const newUsage = { ...settings.dailyUsage, [tier]: (settings.dailyUsage?.[tier] || 0) + 1 };
+          updateSettings({ dailyUsage: newUsage as any });
+        }
+      } else {
+        // 视频生成逻辑
+        const videoSystemPrompt = buildVideoSystemPrompt({
+          modelName: videoConfig.model,
+          minDuration: videoConfig.duration,
+          maxDuration: videoConfig.duration,
+          aspectRatio: `${videoConfig.width}:${videoConfig.height}`,
+          brandName: settings.brandName || videoConfig.brandName,
+          brandUrl: videoConfig.brandUrl,
+          targetLanguage: videoConfig.targetLanguage,
+          videoStyle: videoConfig.videoStyle,
+          enableSound: videoConfig.enableSound,
+          useImageReference: videoConfig.useImageReference,
+          referenceImageUrl: videoConfig.referenceImageUrl || undefined,
         });
+
+        const res = await sendVideoRequest(editedContent, videoSystemPrompt, videoConfig, settings);
+
+        // 视频请求发出成功 (只有未报错时才计次)
+        if (res && res.status !== 'failed' && settings.apiMode === 'internal') {
+          const newUsage = { ...settings.dailyUsage, video: (settings.dailyUsage?.video || 0) + 1 };
+          updateSettings({ dailyUsage: newUsage as any });
+        }
       }
-
-      const systemPrompt = buildSystemPrompt(
-        aiConfig.outputLanguage,  // 使用用户选择的目标语言，而不是UI语言
-        aiConfig.outputFormat,
-        aiConfig.reasoningEffort,
-        aiConfig.enableWebSearch,
-        settings.brandName,
-        settings.companyName
-      );
-
-      await sendPrompt(userPrompt, settings, { ...aiConfig, systemPrompt });
-    } else {
-      // 视频生成逻辑
-      const videoSystemPrompt = buildVideoSystemPrompt({
-        modelName: videoConfig.model,
-        minDuration: videoConfig.duration,
-        maxDuration: videoConfig.duration,
-        aspectRatio: `${videoConfig.width}:${videoConfig.height}`,
-        brandName: settings.brandName || videoConfig.brandName,
-        brandUrl: videoConfig.brandUrl,
-        targetLanguage: videoConfig.targetLanguage,
-        videoStyle: videoConfig.videoStyle,
-        enableSound: videoConfig.enableSound,
-        useImageReference: videoConfig.useImageReference,
-        referenceImageUrl: videoConfig.referenceImageUrl || undefined,
-      });
-
-      await sendVideoRequest(editedContent, videoSystemPrompt, videoConfig, settings);
+    } catch (err) {
+      console.error("Generation failed:", err);
     }
   };
 
@@ -381,6 +429,18 @@ export const App: React.FC = () => {
     setPageContent(null);
     setEditedContent("");
     setSearchTerm("");
+  };
+
+  const resetUsage = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const emptyUsage = {
+      date: today,
+      normalText: 0,
+      proText: 0,
+      video: 0
+    };
+    updateSettings({ dailyUsage: emptyUsage as any });
+    window.alert('试用额度已重置！您可以继续测试。');
   };
 
   const handleTestAllModels = async () => {
@@ -484,7 +544,7 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl shadow-slate-200/40 overflow-hidden flex flex-col min-h-[1000px] animate-fadeIn">
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl shadow-slate-200/40 flex flex-col animate-fadeIn relative overflow-hidden">
           {/* Step 1: Product Selection */}
           {step === 1 && (
             <div className="p-8 lg:p-12 flex-1 flex flex-col animate-in fade-in duration-500">
@@ -621,7 +681,7 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex-1 min-h-[700px] flex flex-col">
+              <div className="flex-1 min-h-[400px] flex flex-col">
                 {editTab === "text" ? (
                   <div className="relative flex-1 group">
                     <textarea
@@ -779,7 +839,7 @@ export const App: React.FC = () => {
                       <div className="bg-white/60 p-6 rounded-3xl border border-slate-100 flex flex-col items-center justify-center text-center">
                         <ShieldCheck className="w-10 h-10 text-blue-100 mb-3" />
                         <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">
-                          Powered by <span className="text-blue-600">Enterprise Engine</span><br />
+                          Powered by <span className="text-blue-600">XOOER AI SEO Engine</span><br />
                           SLA Guaranteed
                         </p>
                       </div>
@@ -1002,7 +1062,7 @@ export const App: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex-1 min-h-[700px] flex flex-col">
+              <div className="flex-1 min-h-[400px] flex flex-col">
                 {/* 文本生成结果 */}
                 {generationMode === "text" && (
                   <>
@@ -1158,7 +1218,7 @@ export const App: React.FC = () => {
 
           {/* Footer Controls */}
           {step < 4 && (
-            <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between">
+            <div className="sticky bottom-0 z-20 p-6 bg-white/95 backdrop-blur-sm border-t border-slate-100 flex items-center justify-between">
               <button
                 onClick={() => setStep(prev => prev - 1)}
                 disabled={step === 1 || aiLoading}
@@ -1202,23 +1262,45 @@ export const App: React.FC = () => {
             </div>
             <div className="bg-slate-50/80 rounded-[2rem] p-8 border border-slate-100 mb-8 shadow-inner">
               <div className="flex justify-between items-center mb-6">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest underline decoration-blue-500 decoration-2 underline-offset-4">Current Plan</span>
-                <span className="px-4 py-1.5 bg-blue-600 text-white rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">PRO PLAN</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest underline decoration-blue-500 decoration-2 underline-offset-4">Today's Usage</span>
+                <span className="px-4 py-1.5 bg-blue-600 text-white rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">FREE TRIAL</span>
               </div>
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-black text-slate-500 uppercase tracking-tight">Available Credits</span>
-                  <span className="text-sm font-black text-slate-800">{(settings?.usageLimit || 0) - (settings?.usageCount || 0)} <span className="text-slate-300 text-[10px]">PTS</span></span>
+                  <span className="text-[10px] font-black text-slate-500 uppercase">Normal Text</span>
+                  <span className="text-xs font-bold text-slate-800">{settings.dailyUsage?.normalText || 0} / {DAILY_LIMITS.normalText}</span>
                 </div>
-                <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner ring-4 ring-slate-50/50">
-                  <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg" style={{ width: `${((settings?.usageLimit || 1) - (settings?.usageCount || 0)) / (settings?.usageLimit || 1) * 100}%` }} />
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-slate-500 uppercase">Pro Text</span>
+                  <span className="text-xs font-bold text-slate-800">{settings.dailyUsage?.proText || 0} / {DAILY_LIMITS.proText}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-200 pt-3">
+                  <span className="text-[10px] font-black text-slate-500 uppercase">Video</span>
+                  <span className="text-xs font-bold text-slate-800">{settings.dailyUsage?.video || 0} / {DAILY_LIMITS.video}</span>
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 mb-8">
+
+            <div className="bg-slate-900 rounded-[2rem] p-8 border border-slate-800 mb-8 shadow-xl">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Credit Balance</span>
+                <Sparkles className="w-4 h-4 text-amber-400" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black text-white">{(settings?.usageLimit || 0) - (settings?.usageCount || 0)}</span>
+                <span className="text-xs font-bold text-slate-400 uppercase">PTS</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <button className="flex items-center justify-center gap-2 py-4 border-2 border-slate-100 rounded-2xl text-[10px] font-black text-slate-500 hover:bg-slate-50 hover:border-slate-200 transition-all active:scale-95 uppercase tracking-widest shadow-sm"><History className="w-4 h-4" /> Records</button>
               <button className="flex items-center justify-center gap-2 py-4 border-2 border-slate-100 rounded-2xl text-[10px] font-black text-red-500 hover:bg-red-50 hover:border-red-100 transition-all active:scale-95 uppercase tracking-widest shadow-sm"><LogOut className="w-4 h-4" /> Log out</button>
             </div>
+            <button
+              onClick={resetUsage}
+              className="w-full py-4 mb-8 border-2 border-blue-100 rounded-[2rem] text-[10px] font-black text-blue-600 hover:bg-blue-50 transition-all active:scale-95 uppercase tracking-[0.2em]"
+            >
+              Reset Daily Usage (Testing)
+            </button>
             <button onClick={() => setModal("upgrade")} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black shadow-2xl hover:bg-blue-600 transition-all active:scale-95 uppercase tracking-[0.2em]">Buy More Power</button>
           </div>
         </div>
@@ -1233,29 +1315,61 @@ export const App: React.FC = () => {
               <h3 className="text-3xl font-black text-slate-800 tracking-tight uppercase">Elevate your SEO power</h3>
               <p className="text-slate-400 text-sm font-medium mt-2">Unlock unlimited generations and priority processing</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="p-10 border-4 border-slate-100 rounded-[3rem] hover:border-blue-100 transition-all group bg-white shadow-xl hover:shadow-2xl hover:-translate-y-1 duration-500">
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Professional Monthly</div>
-                <div className="text-5xl font-black text-slate-900 mb-2">$29<span className="text-sm font-medium text-slate-400">/mo</span></div>
-                <div className="h-px bg-slate-100 my-6" />
-                <ul className="space-y-4 mb-10 text-[11px] font-bold text-slate-500 uppercase tracking-tight">
-                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Unlimited generations</li>
-                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> All premium models</li>
-                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Priority 24/7 Support</li>
-                </ul>
-                <button className="w-full py-5 bg-slate-100 rounded-[1.5rem] text-[10px] font-black text-slate-500 group-hover:bg-slate-900 group-hover:text-white transition-all uppercase tracking-widest">Subscribe Now</button>
+            <div className="space-y-8 max-h-[600px] overflow-y-auto pr-4 scrollbar-thin">
+              {/* Refill Section */}
+              <div className="p-10 border-4 border-blue-600 bg-blue-50/30 rounded-[3.5rem] relative shadow-2xl shadow-blue-100">
+                <div className="absolute top-0 right-10 bg-blue-600 text-white text-[10px] font-black px-6 py-2 rounded-b-[1rem] uppercase tracking-[0.2em] shadow-lg">推荐方案</div>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                  <div>
+                    <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">PTS 点数包</div>
+                    <div className="text-5xl font-black text-slate-900">$9<span className="text-sm font-medium text-slate-400"> / 50 PTS</span></div>
+                  </div>
+                  <button className="px-10 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all uppercase tracking-widest active:scale-95">立即充值</button>
+                </div>
+
+                <div className="h-px bg-blue-100 mb-8" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" /> 专业级生成 (Pro)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 font-bold ml-6 uppercase">消耗 5 PTS / 篇</p>
+                    <p className="text-[10px] text-slate-400 ml-6">可生成 10 篇高品质博文<br />(约合 $0.9 / 篇)</p>
+                  </div>
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" /> 轻量级生成 (Normal)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 font-bold ml-6 uppercase">消耗 2 PTS / 篇</p>
+                    <p className="text-[10px] text-slate-400 ml-6">可生成 25 篇博文<br />(约合 $0.36 / 篇)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" /> 智能视频 (Video)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 font-bold ml-6 uppercase">消耗 15 PTS / 次</p>
+                    <p className="text-[10px] text-slate-400 ml-6">可生成 3 次短视频<br />(覆盖高昂渲染成本)</p>
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <div className="bg-white/60 p-4 rounded-2xl border border-blue-50 flex items-center gap-3">
+                      <Zap className="w-5 h-5 text-amber-500 fill-current" />
+                      <span className="text-[10px] font-black text-slate-600 uppercase leading-tight">永久有效，无使用期限限制，全模型解锁</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="p-10 border-4 border-blue-600 bg-blue-50/30 rounded-[3rem] relative shadow-2xl shadow-blue-100 hover:-translate-y-1 duration-500">
-                <div className="absolute top-0 right-10 bg-blue-600 text-white text-[10px] font-black px-6 py-2 rounded-b-[1rem] uppercase tracking-[0.2em] shadow-lg">Hot Seller</div>
-                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">Credits Refill</div>
-                <div className="text-5xl font-black text-slate-900 mb-2">$9<span className="text-sm font-medium text-slate-400">/50 PTS</span></div>
-                <div className="h-px bg-blue-100 my-6" />
-                <ul className="space-y-4 mb-10 text-[11px] font-bold text-slate-600 uppercase tracking-tight">
-                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-blue-500" /> Fixed cost, no expiry</li>
-                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-blue-500" /> Pay-as-you-go model</li>
-                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-blue-500" /> Use premium credits anytime</li>
-                </ul>
-                <button className="w-full py-5 bg-blue-600 text-white rounded-[1.5rem] text-[10px] font-black shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all uppercase tracking-widest">Buy Refill Pack</button>
+
+              {/* Monthly Section (Simplified) */}
+              <div className="p-10 border-2 border-slate-100 rounded-[3rem] bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-6 group hover:border-slate-200 transition-all">
+                <div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">企业无限订阅 (Monthly)</div>
+                  <div className="text-2xl font-black text-slate-900">$29<span className="text-xs font-medium text-slate-400"> / 月</span></div>
+                </div>
+                <button className="px-8 py-4 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all uppercase tracking-widest active:scale-95 shadow-sm">联系销售咨询</button>
               </div>
             </div>
             <p className="text-center mt-10 text-[10px] font-medium text-slate-400 flex items-center justify-center gap-2">
