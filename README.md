@@ -39,11 +39,11 @@
 - **文本生成** - 使用 AI 生成 SEO/GEO 优化的产品博客文章
   - **12种输出语言** - 支持 Auto、English、简体中文、繁體中文、日本語、한국어、Español、Français、Deutsch、Português、Русский、العربية
   - **独立语言选择** - UI 语言和 AI 输出语言独立配置，灵活满足多语言需求
-- **视频生成** 🎬 - 支持多种领先视频生成模型：
-  - **OpenAI**: Sora-2, Sora-2-Pro
-  - **Google Veo**: Veo-3.1, Veo-3.0 系列, Veo-2.0
-  - **通义千问**: Wan 2.6 T2V, Wan 2.5 T2V Preview, Wan 2.2 T2V Plus
-  - **豆包**: Doubao Seedance 1.5 Pro
+- **视频生成** 🎬 - 支持领先视频生成模型（已对齐 LiteLLM 官方规范）：
+  - **OpenAI Sora 2** - 最大 8 秒，720x1280 或 1280x720
+  - **Google Veo 3.1** - 最大 8 秒，1920x1080，支持音频生成
+  - **Google Veo 3.0** - 最大 8 秒，1280x720，支持音频生成
+  - **统一 API 格式** - 使用 LiteLLM OpenAI 兼容接口，自动处理不同提供商的参数映射
   - **双模式界面** - 文本/视频生成模式一键切换
   - **丰富配置选项** - 视频模型、风格、时长、分辨率等全面可配置
   - **实时进度显示** - 圆形进度条显示视频生成进度
@@ -234,22 +234,33 @@
 
 ### 视频生成配置
 
-#### 支持的视频模型
+#### 支持的视频模型（已对齐 LiteLLM 官方规范）
 
-- **OpenAI (GPT)**: 
-  - sora-2 (支持图片参考，最大 20 秒)
-  - sora-2-pro (支持图片参考和音频，最大 60 秒)
-- **Google Gemini**: 
-  - veo-3.1-generate-preview (支持音频，1920x1080)
-  - veo-3.1-fast-generate-preview (快速预览，1280x720)
-  - veo-3.0-generate-001 (稳定版，支持音频)
-  - veo-3.0-fast-generate-001 (快速版本)
-- **通义千问 (Qwen)**: 
-  - wan2.6-t2v (Text-to-Video)
-  - wan2.5-t2v-preview (预览版)
-  - wan2.2-t2v-plus (增强版)
-- **豆包 (Doubao)**: 
-  - doubao-seedance-1-5-pro-251215 (支持音频，1920x1080，最大 15 秒)
+- **OpenAI Sora 2** (`openai/sora-2`)
+  - 最大时长：8 秒
+  - 支持尺寸：720x1280 (9:16 竖屏) 或 1280x720 (16:9 横屏)
+  - 支持图片参考：✅
+  - 音频生成：❌
+
+- **Google Veo 3.1** (`gemini/veo-3.1-generate-preview`)
+  - 最大时长：8 秒
+  - 默认分辨率：1920x1080
+  - 支持图片参考：✅
+  - 音频生成：✅
+
+- **Google Veo 3.0** (`gemini/veo-3.0-generate-preview`)
+  - 最大时长：8 秒
+  - 默认分辨率：1280x720
+  - 支持图片参考：✅
+  - 音频生成：✅
+
+#### LiteLLM 统一 API 格式
+
+应用使用 LiteLLM 的统一 OpenAI 兼容格式：
+- **参数格式**：`seconds` (字符串) + `size` (如 "720x1280")
+- **自动映射**：LiteLLM 自动将参数转换为各提供商的原生格式
+  - OpenAI (Sora): 直接使用 `seconds` 和 `size`
+  - Gemini (Veo): 自动映射为 `durationSeconds` 和 `aspectRatio`
 
 #### 视频风格选项
 
@@ -260,9 +271,9 @@
 
 #### 重要提示
 
-> **视频生成建议使用 LLM Lite**：
+> **视频生成建议使用 LiteLLM Gateway**：
 > - 视频模型的原生 API 通常禁止浏览器直接调用（CORS 限制）
-> - 使用 LLM Lite 中转服务器可以绕过 CORS 限制
+> - 使用 LiteLLM Gateway 可以绕过 CORS 限制
 > - 提供更好的安全性和配额管理
 > - 详见 [API 部署与配置指南](./docs/API_CONFIGURATION.md)
 

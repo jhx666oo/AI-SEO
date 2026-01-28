@@ -342,16 +342,15 @@ export async function createVideoTask(
     }
 
     // Build video generation request
-    // Standard LiteLLM/OpenAI-style media generation format
+    // LiteLLM unified video generation format (OpenAI-compatible)
+    // LiteLLM automatically maps parameters for different providers:
+    // - OpenAI (Sora): uses 'seconds' and 'size' directly
+    // - Gemini (Veo): maps 'size' → 'aspectRatio' (16:9/9:16), 'seconds' → 'durationSeconds'
     const requestBody = {
         model: videoConfig.model,
         prompt: prompt,
-        duration: videoConfig.duration,
-        width: videoConfig.width,
-        height: videoConfig.height,
-        // Optional parameters for specific providers
-        negative_prompt: '',
-        quality: 'standard'
+        seconds: videoConfig.duration.toString(), // String format (e.g., "8")
+        size: `${videoConfig.width}x${videoConfig.height}`, // Format: "720x1280" or "1280x720"
     };
 
     // Unified video endpoint - Plural /videos for LiteLLM Gateway
