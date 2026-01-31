@@ -449,97 +449,110 @@ export async function createVideoTask(
 /**
  * Poll video generation status
  */
+/**
+ * Poll video generation status (V4 Simplified Stream Logic)
+ */
 export async function pollVideoTask(
     taskId: string,
     settings: Settings
 ): Promise<VideoResponse> {
-    console.log('[Video Poll] Polling task:', taskId);
+    console.log('[Video Poll V4] Checking status for:', taskId.substring(0, 20) + '...');
 
-    // Determine API Key based on mode
     let apiKey = settings.apiKey;
     let baseUrl = settings.baseUrl;
-
     if (settings.apiMode === 'internal') {
         apiKey = import.meta.env.VITE_LITELLM_API_KEY || '';
         baseUrl = import.meta.env.VITE_LITELLM_BASE_URL || 'https://litellm.xooer.com/v1';
     }
 
-    if (!apiKey) {
-        return {
-            result: {
-                type: 'text',
-                status: 'failed',
-                content: '',
-                prompt: '',
-                error: 'API Key not configured'
-            }
-        };
-    }
-
-    // Polling endpoint - /v1/videos/{id} based on LiteLLM OpenAPI schema
-    const apiUrl = `${baseUrl}/videos/${taskId}`;
+    const headers = {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+    };
 
     try {
-        const headers: Record<string, string> = {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-        };
-
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers,
-        });
+        const statusUrl = `${baseUrl}/videos/${encodeURIComponent(taskId)}`;
+        const response = await fetch(statusUrl, { method: 'GET', headers });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[Video Poll] Error:', errorText);
-            return {
-                result: {
-                    type: 'text',
-                    status: 'failed',
-                    content: '',
-                    prompt: '',
-                    error: `Polling failed: ${response.statusText}`
-                }
-            };
+            console.warn(`[Video Poll V4] HTTP ${response.status} for ${taskId.substring(0, 10)}`);
+            // Treat server errors (500+) as transient processing states
+            if (response.status >= 500) {
+                return {
+                    result: {
+                        type: 'video', status: 'processing', content: 'Gateway fluctuation...',
+                        taskId, prompt: '', progress: 0
+                    }
+                };
+            }
+            throw new Error(`Poll request failed: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('[Video Poll] Status:', data.status);
+        console.log(`[Video Poll V4] Current status: ${data.status}`);
 
-        // Parse polling response
-        if (data.status === 'completed' && data.video_url) {
+        // ---------------------------------------------------------
+        // CASE: COMPLETED
+        // ---------------------------------------------------------
+        if (data.status === 'completed') {
+            let finalVideoUrl = data.video_url || data.url || '';
+
+            // If no public URL is provided, we MUST fetch via the /content endpoint
+            if (!finalVideoUrl) {
+                console.log('[Video Poll V4] No direct URL. Fetching via /content stream...');
+                const contentUrl = `${baseUrl}/videos/${encodeURIComponent(taskId)}/content`;
+
+                try {
+                    const contentRes = await fetch(contentUrl, { method: 'GET', headers });
+                    if (contentRes.ok) {
+                        const blob = await contentRes.blob();
+                        finalVideoUrl = URL.createObjectURL(blob);
+                        console.log('[Video Poll V4] Blob URL created successfully');
+                    } else {
+                        console.error('[Video Poll V4] Content stream fetch failed:', contentRes.status);
+                    }
+                } catch (contentErr) {
+                    console.error('[Video Poll V4] Exception during stream fetch:', contentErr);
+                }
+            }
+
             return {
                 result: {
                     type: 'video',
                     status: 'completed',
                     content: 'Video generated successfully',
-                    videoUrl: data.video_url,
+                    videoUrl: finalVideoUrl,
                     taskId,
                     prompt: data.prompt || '',
                     progress: 100,
+                    error: finalVideoUrl ? undefined : 'Video content could not be retrieved'
                 }
             };
         } else if (data.status === 'failed') {
+            const rawError = (data.error || 'Video generation failed') as any;
+            const errorMessage = typeof rawError === 'object' && rawError !== null ? (rawError.message || JSON.stringify(rawError)) : String(rawError);
             return {
                 result: {
                     type: 'text',
                     status: 'failed',
                     content: '',
                     prompt: data.prompt || '',
-                    error: data.error || 'Video generation failed'
+                    error: errorMessage
                 }
             };
         } else {
-            // Still processing
+            const normalizedStatus = ['queued', 'in_progress', 'running', 'processing'].includes(data.status)
+                ? 'processing'
+                : (data.status || 'processing');
+
             return {
                 result: {
                     type: 'video',
-                    status: 'processing',
-                    content: 'Video generation in progress',
+                    status: normalizedStatus as any,
+                    content: `Status: ${data.status || 'Processing'}`,
                     taskId,
                     prompt: data.prompt || '',
-                    progress: data.progress || 0,
+                    progress: data.progress || data.progress_percent || 0,
                 }
             };
         }
@@ -555,6 +568,43 @@ export async function pollVideoTask(
                 error: errorMessage
             }
         };
+    }
+}
+
+/**
+ * Fetch video content with authorization and return as a Blob URL
+ */
+export async function getVideoContent(
+    videoUrl: string,
+    settings: Settings
+): Promise<{ blobUrl: string; error?: string }> {
+    console.log('[Video Content] Downloading authorized video:', videoUrl);
+
+    let apiKey = settings.apiKey;
+    if (settings.apiMode === 'internal') {
+        apiKey = import.meta.env.VITE_LITELLM_API_KEY || '';
+    }
+
+    try {
+        const response = await fetch(videoUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to download video: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        console.log('[Video Content] Created local Blob URL:', blobUrl);
+        return { blobUrl };
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error('[Video Content] Download failed:', errorMessage);
+        return { blobUrl: '', error: errorMessage };
     }
 }
 
@@ -596,9 +646,6 @@ export async function testModel(settings: Settings): Promise<{ success: boolean;
         };
     }
 }
-
-// Export types for backward compatibility
-export type { AIMessage, AIResponse, VideoResponse };
 
 // Alias for backward compatibility
 export const generateVideo = createVideoTask;

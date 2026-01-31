@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Zap,
   Search,
@@ -223,6 +223,24 @@ export const App: React.FC = () => {
 
   const t = locales[lang];
 
+  // 自动触发视频生成 (改为仅作为防重复触发锁，不自动执行)
+  const triggerGuard = useRef<string | null>(null);
+  useEffect(() => {
+    // 仅用于清理或状态追踪，不再自动调用 handleGenerate
+    const currentTriggerKey = `${step}-${generationMode}`;
+
+    // 如果不在第 3 步，或者切换了模式，或者当前没有正在进行的任务且已失败，则重置锁
+    const isInactive = !videoPolling && !aiLoading;
+    const isFailed = videoResult?.status === 'failed' || !!aiError;
+
+    if (step !== 3 || generationMode !== 'video' || (isInactive && isFailed)) {
+      if (triggerGuard.current === currentTriggerKey) {
+        console.log('[App] Resetting trigger guard for retry or step change');
+        triggerGuard.current = null;
+      }
+    }
+  }, [step, generationMode, videoPolling, aiLoading, videoResult?.status, !!aiError]);
+
   // 计算当前选中的视频模型配置
   const currentVideoModelConfig = VIDEO_MODELS.find(m => m.name === videoConfig.model) || VIDEO_MODELS[0];
 
@@ -346,6 +364,16 @@ export const App: React.FC = () => {
   };
 
   const handleGenerate = async () => {
+    // 针对视频生成的防重复触发保护
+    if (generationMode === 'video') {
+      const currentTriggerKey = `${step}-${generationMode}`;
+      if (triggerGuard.current === currentTriggerKey) {
+        console.warn('[App] Video generation already in progress for this step. Ignoring duplicate request.');
+        return;
+      }
+      triggerGuard.current = currentTriggerKey;
+    }
+
     // 检查每日限制 (仅在内部 API 模式下)
     if (settings.apiMode === 'internal') {
       const usage = settings.dailyUsage || { normalText: 0, proText: 0, video: 0 };
@@ -425,6 +453,7 @@ export const App: React.FC = () => {
   const handleRestart = () => {
     setStep(1);
     clearResult();
+    triggerGuard.current = null;
     setSelectedProductId(null);
     setPageContent(null);
     setEditedContent("");
@@ -1102,7 +1131,7 @@ export const App: React.FC = () => {
                         <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
                         <h3 className="text-lg font-black text-red-700 uppercase">视频生成失败</h3>
                         <p className="text-sm text-red-600/80 font-medium mt-2 max-w-sm">
-                          {videoResult?.error || aiError || "视频生成过程中出现错误"}
+                          {typeof videoResult?.error === 'object' ? JSON.stringify(videoResult.error) : (videoResult?.error || aiError || "视频生成过程中出现错误")}
                         </p>
                         {videoResult?.prompt && (
                           <div className="mt-4 p-4 bg-white rounded-2xl border border-red-200 max-w-lg">
@@ -1190,7 +1219,7 @@ export const App: React.FC = () => {
                           )}
 
                           {/* 显示生成的提示词（pending状态） */}
-                          {videoResult?.prompt && videoResult.status === 'pending' && (
+                          {videoResult?.prompt && (videoResult.status === 'pending' || videoResult.status === 'processing') && (
                             <div className="mt-6 p-6 bg-blue-50 rounded-3xl border border-blue-100 max-w-2xl mx-auto">
                               <div className="flex items-center gap-2 mb-3">
                                 <Film className="w-4 h-4 text-blue-600" />

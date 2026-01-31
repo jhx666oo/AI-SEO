@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Settings, AIConfig, DEFAULT_AI_CONFIG, VideoConfig, VideoGenerationResult } from '@/types';
-import { sendToAI, generateVideo, generateVideoPrompt, pollVideoTask } from '@/services/ai';
+import { sendToAI, generateVideo, generateVideoPrompt, pollVideoTask, getVideoContent } from '@/services/ai';
 
 export function useAI() {
   const [loading, setLoading] = useState(false);
@@ -36,6 +36,9 @@ export function useAI() {
     let pollCount = 0;
     const maxPolls = 60; // Max 5 minutes (60 * 5s)
 
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 3;
+
     pollingRef.current = setInterval(async () => {
       pollCount++;
 
@@ -49,21 +52,47 @@ export function useAI() {
       try {
         const response = await pollVideoTask(taskId, settingsRef.current!);
         console.log('[Polling] Result:', response);
+        consecutiveErrors = 0; // Reset error counter on success
 
-        if (response.result.status === 'completed' && response.result.videoUrl) {
+        if (response.result.status === 'completed') {
           stopPolling();
-          setVideoResult({
-            ...response.result,
-            prompt: prompt,
-          });
           setLoading(false);
+
+          // If the URL is already a local Blob URL (from V4 stream logic), use it directly
+          if (response.result.videoUrl?.startsWith('blob:')) {
+            setVideoResult({ ...response.result, prompt: prompt });
+            return;
+          }
+
+          // Fallback for external URLs: fetch-to-blob for authorized gateways
+          if (response.result.videoUrl && settingsRef.current) {
+            try {
+              const { blobUrl, error: fetchErr } = await getVideoContent(response.result.videoUrl, settingsRef.current);
+              if (fetchErr) {
+                setError(fetchErr);
+                setVideoResult({ ...response.result, status: 'failed', error: fetchErr, prompt: prompt });
+              } else {
+                setVideoResult({ ...response.result, videoUrl: blobUrl, prompt: prompt });
+              }
+            } catch (e) {
+              setError('Failed to process video content');
+              setVideoResult({ ...response.result, status: 'failed', error: 'Failed to process video content', prompt: prompt });
+            }
+          } else {
+            setError('Video URL not found in API response');
+            setVideoResult({ ...response.result, status: 'failed', error: 'Missing video URL', prompt: prompt });
+          }
         } else if (response.result.status === 'failed') {
           stopPolling();
-          setError(response.error || 'Video generation failed');
+          const rawErr = (response.error || response.result.error || 'Video generation failed') as any;
+          const errStr = typeof rawErr === 'object' && rawErr !== null ? (rawErr.message || JSON.stringify(rawErr)) : String(rawErr);
+          setError(errStr);
           setVideoResult({
             ...response.result,
             prompt: prompt,
             type: 'text',
+            status: 'failed',
+            error: errStr
           });
           setLoading(false);
         } else {
@@ -75,8 +104,16 @@ export function useAI() {
           } : null);
         }
       } catch (err) {
-        console.error('[Polling] Error:', err);
-        // Don't stop on network errors, keep trying
+        console.warn('[Polling] Network error during poll:', err);
+        consecutiveErrors++;
+
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          stopPolling();
+          setError('Network error: Connection lost during video generation. Please check your connection.');
+          setVideoResult(prev => prev ? { ...prev, status: 'failed', error: 'Network Connection Lost' } : null);
+          setLoading(false);
+        }
+        // Otherwise, keep the interval running - it will try again on the next tick
       }
     }, 5000); // Poll every 5 seconds
   }, [stopPolling]);
@@ -172,8 +209,10 @@ export function useAI() {
 
       setVideoResult(response.result);
 
-      // If pending, start polling
-      if (response.result.type === 'pending' && response.result.taskId) {
+      // If pending, queued, processing or in_progress, start polling
+      const isStillWorking = ['pending', 'processing', 'queued', 'in_progress', 'running', 'starting'].includes(response.result.status);
+      if (isStillWorking && response.result.taskId) {
+        console.log(`[useAI] Task initiated with status "${response.result.status}". Starting poll...`);
         startPolling(response.result.taskId, response.result.prompt || '');
         return response.result;
       }
